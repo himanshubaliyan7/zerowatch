@@ -1,0 +1,100 @@
+{{- $api := dict "ctx" $ "component" (include "zerowatch.apiComponent" .) }}
+{{- $ing := dict "ctx" $ "component" (include "zerowatch.ingestComponent" .) }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "zerowatch.fullname" . }}
+  labels:
+    {{- include "zerowatch.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "zerowatch.selectorLabels" $api | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.ports.http }}
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "zerowatch.fullname" . }}-ingest
+  labels:
+    {{- include "zerowatch.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ingest-endpoint
+  {{- with .Values.ingestService.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.ingestService.type }}
+  selector:
+    {{- include "zerowatch.selectorLabels" $ing | nindent 4 }}
+  ports:
+    # /cloudwatch, /api/v1/ingest/*, and every other ingest route.
+    - name: http
+      port: {{ .Values.ports.http }}
+      targetPort: http
+      protocol: TCP
+    - name: otlp
+      port: {{ .Values.ports.otlp }}
+      targetPort: otlp
+      protocol: TCP
+    - name: prom
+      port: {{ .Values.ports.prom }}
+      targetPort: prom
+      protocol: TCP
+{{- if .Values.statsdService.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "zerowatch.fullname" . }}-statsd
+  labels:
+    {{- include "zerowatch.labels" . | nindent 4 }}
+    app.kubernetes.io/component: statsd-endpoint
+  {{- with .Values.statsdService.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.statsdService.type }}
+  selector:
+    {{- include "zerowatch.selectorLabels" $ing | nindent 4 }}
+  ports:
+    - name: statsd
+      port: {{ .Values.ports.statsd }}
+      targetPort: statsd
+      protocol: UDP
+{{- end }}
+{{- if and (eq .Values.mode "single") .Values.agent.enabled }}
+---
+# Gossip endpoint the agents join in single mode.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "zerowatch.fullname" . }}-gossip
+  labels:
+    {{- include "zerowatch.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gossip
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    {{- include "zerowatch.selectorLabels" $api | nindent 4 }}
+  ports:
+    - name: gossip-tcp
+      port: {{ .Values.ports.gossip }}
+      targetPort: gossip-tcp
+      protocol: TCP
+    - name: gossip-udp
+      port: {{ .Values.ports.gossip }}
+      targetPort: gossip-udp
+      protocol: UDP
+{{- end }}

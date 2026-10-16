@@ -1,0 +1,92 @@
+{{- /* mode=cluster: the ingest and query Deployments (and their HPAs). */}}
+{{- if eq .Values.mode "cluster" }}
+{{- range $role := list "ingest" "query" }}
+{{- $c := dict "ctx" $ "component" $role }}
+{{- $s := index $.Values $role }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "zerowatch.fullname" $ }}-{{ $role }}
+  labels:
+    {{- include "zerowatch.componentLabels" $c | nindent 4 }}
+spec:
+  {{- if not $s.autoscaling.enabled }}
+  replicas: {{ $s.replicas }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "zerowatch.selectorLabels" $c | nindent 6 }}
+  template:
+    metadata:
+      {{- include "zerowatch.podMeta" $c | nindent 6 }}
+    spec:
+      {{- include "zerowatch.podCommon" $ | nindent 6 }}
+      {{- with $.Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- include "zerowatch.seedWait" $ | nindent 6 }}
+      containers:
+        - name: zerowatch
+          image: {{ include "zerowatch.image" $ }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          args:
+            - --role={{ $role }}
+            {{- with $.Values.extraArgs }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          env:
+            {{- include "zerowatch.env" $c | nindent 12 }}
+            - name: ZW_CLUSTER_SEEDS
+              value: {{ include "zerowatch.seeds" $ | quote }}
+            - name: ZW_SUPERVISOR
+              value: "false"
+          {{- with $.Values.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            {{- include "zerowatch.containerPorts" (dict "ctx" $ "ingest" (eq $role "ingest") "gossip" true) | nindent 12 }}
+          {{- include "zerowatch.probes" (dict "ctx" $ "port" "http") | nindent 10 }}
+          resources:
+            {{- toYaml $s.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml $.Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        # Only the local SQLite metadata lives here; use a shared DSN for
+        # anything that must outlive the pod.
+        - name: data
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+{{- if $s.autoscaling.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "zerowatch.fullname" $ }}-{{ $role }}
+  labels:
+    {{- include "zerowatch.componentLabels" $c | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "zerowatch.fullname" $ }}-{{ $role }}
+  minReplicas: {{ $s.autoscaling.minReplicas }}
+  maxReplicas: {{ $s.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ $s.autoscaling.targetCPUUtilizationPercentage }}
+{{- end }}
+{{- end }}
+{{- end }}

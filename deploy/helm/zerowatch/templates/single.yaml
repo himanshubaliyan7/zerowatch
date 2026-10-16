@@ -1,0 +1,89 @@
+{{- if eq .Values.mode "single" }}
+{{- $c := dict "ctx" $ "component" "single" }}
+{{- $s := .Values.single }}
+{{- if and $s.persistence.enabled (not $s.persistence.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "zerowatch.fullname" . }}-data
+  labels:
+    {{- include "zerowatch.componentLabels" $c | nindent 4 }}
+spec:
+  accessModes:
+    {{- toYaml $s.persistence.accessModes | nindent 4 }}
+  {{- with $s.persistence.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ $s.persistence.size }}
+---
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "zerowatch.fullname" . }}
+  labels:
+    {{- include "zerowatch.componentLabels" $c | nindent 4 }}
+spec:
+  replicas: 1
+  # One writer for the PVC and the in-memory engine.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "zerowatch.selectorLabels" $c | nindent 6 }}
+  template:
+    metadata:
+      {{- include "zerowatch.podMeta" $c | nindent 6 }}
+    spec:
+      {{- include "zerowatch.podCommon" . | nindent 6 }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: zerowatch
+          image: {{ include "zerowatch.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --role=all
+            {{- with $.Values.extraArgs }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          env:
+            {{- include "zerowatch.env" $c | nindent 12 }}
+            - name: ZW_SUPERVISOR
+              value: {{ $s.supervisor | quote }}
+            {{- if .Values.agent.enabled }}
+            # Seeding itself turns on gossip, so the agent DaemonSet can join.
+            - name: ZW_CLUSTER_SEEDS
+              value: "$(POD_IP):{{ .Values.ports.gossip }}"
+            {{- end }}
+          {{- with .Values.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            {{- include "zerowatch.containerPorts" (dict "ctx" $ "ingest" true "gossip" true) | nindent 12 }}
+          {{- include "zerowatch.probes" (dict "ctx" $ "port" "http") | nindent 10 }}
+          resources:
+            {{- toYaml $s.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          {{- if $s.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ $s.persistence.existingClaim | default (printf "%s-data" (include "zerowatch.fullname" .)) }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: tmp
+          emptyDir: {}
+{{- end }}

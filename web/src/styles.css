@@ -1,0 +1,220 @@
+@import "tailwindcss";
+
+/* Fonts are served by ZeroWatch itself (public/fonts), latin subset: no request to another company's servers. */
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 400 600; font-display: swap; src: url("/fonts/dm-sans-v17-bu0-K4.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 400 500; font-display: swap; src: url("/fonts/jetbrains-mono-v24-PxDcwg.woff2") format("woff2"); }
+@font-face { font-family: "Space Grotesk"; font-style: normal; font-weight: 300 700; font-display: swap; src: url("/fonts/space-grotesk-v22-PbF4Cw.woff2") format("woff2"); }
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Design system: an instrument log.
+ *
+ * Hairline frames, square corners and no accent hue. The page is bone on black
+ * (dark) or ink on paper (light); the only colour on it is a status the
+ * platform computed: an HTTP class, a log level, an alarm state. So colour
+ * always means data.
+ */
+
+@theme inline {
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-hair: var(--hair);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-tone-positive: var(--tone-positive);
+  --color-tone-warning: var(--tone-warning);
+  --color-tone-critical: var(--tone-critical);
+}
+
+/* Paper: ink on bone. */
+:root {
+  --background: oklch(0.95 0.014 85);
+  --foreground: oklch(0.17 0 0);
+  --muted: oklch(0.915 0.018 85);
+  --muted-foreground: oklch(0.42 0.01 85);
+  --border: oklch(0.17 0 0 / 30%);
+  --hair: oklch(0.17 0 0 / 11%);
+  --input: oklch(0.17 0 0 / 38%);
+  --ring: oklch(0.17 0 0);
+  /* The three status tones. They are data: 2xx/4xx/5xx, info/warn/error, OK/ALARM. */
+  --tone-positive: oklch(0.56 0.14 152);
+  --tone-warning: oklch(0.66 0.16 62);
+  --tone-critical: oklch(0.54 0.2 27);
+}
+
+/* Instrument: bone on black. */
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.95 0.014 85);
+  --muted: oklch(0.195 0 0);
+  --muted-foreground: oklch(0.74 0.008 85);
+  --border: oklch(0.95 0.014 85 / 24%);
+  --hair: oklch(0.95 0.014 85 / 9%);
+  --input: oklch(0.95 0.014 85 / 32%);
+  --ring: oklch(0.95 0.014 85);
+  --tone-positive: oklch(0.68 0.15 152);
+  --tone-warning: oklch(0.75 0.16 62);
+  --tone-critical: oklch(0.66 0.19 25);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html {
+    color-scheme: light;
+    background: var(--color-background);
+    /* `clip`, not `hidden`: nothing can widen the page on a phone and sticky headers keep working. */
+    overflow-x: clip;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: clip;
+  }
+  input {
+    accent-color: var(--color-foreground);
+  }
+  button {
+    cursor: pointer;
+  }
+  ::selection {
+    background-color: var(--color-foreground);
+    color: var(--color-background);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-foreground);
+    outline-offset: 3px;
+  }
+}
+
+/* A faint paper grain over the whole page; decoration only. */
+.grain::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.07;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Diagonal hatching: "nothing measured here". Never a status colour. */
+.hatch {
+  background-image: repeating-linear-gradient(135deg, var(--border) 0 1px, transparent 1px 7px);
+}
+
+/* The measuring plot's vertical grid. */
+.plot-grid {
+  background-image: repeating-linear-gradient(to right, var(--hair) 0 1px, transparent 1px calc(100% / 12));
+}
+
+/* A headline line that slides up from behind its own baseline. */
+.ln {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 0.06em;
+}
+.ln > span {
+  display: block;
+}
+
+/* The bright frame that draws outward over a plot, then settles. */
+.frame-draw::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border: 1px solid var(--foreground);
+  pointer-events: none;
+  opacity: 0;
+}
+.scan {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: var(--foreground);
+  opacity: 0;
+  pointer-events: none;
+}
+/* A connector between two steps of a diagram: dashes that march in the direction of flow. */
+.flow-x,
+.flow-y {
+  --flow-ink: var(--foreground);
+  flex: none;
+}
+.flow-x {
+  height: 1px;
+  background-image: repeating-linear-gradient(90deg, var(--flow-ink) 0 5px, transparent 5px 12px);
+  background-size: 12px 1px;
+}
+.flow-y {
+  width: 1px;
+  background-image: repeating-linear-gradient(180deg, var(--flow-ink) 0 5px, transparent 5px 12px);
+  background-size: 1px 12px;
+}
+.bar-grow {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+.grow-x {
+  transform-origin: left;
+}
+
+/*
+ * Motion. Every animation starts from the finished layout and runs once on
+ * mount, staggered by --i. All of it is off for visitors who ask for less motion.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .blink { animation: blink 1.2s steps(2, end) infinite; }
+  .ln > span { animation: lineup 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: calc(var(--i, 0) * 110ms); }
+  .rise-in { animation: rise-in 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: calc(var(--i, 0) * 60ms + 150ms); }
+  .grow-x { animation: grow-x 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: calc(var(--i, 0) * 70ms + 300ms); }
+  .wipe { animation: wipe 0.9s cubic-bezier(0.3, 0.6, 0.2, 1) both; animation-delay: calc(min(var(--i, 0), 24) * 40ms + 350ms); }
+  .frame-draw::after { animation: frame-draw 1.1s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .scan { animation: scan 1.6s cubic-bezier(0.3, 0.5, 0.3, 1) 0.2s both; }
+  .pop { animation: pop 0.4s cubic-bezier(0.3, 1.6, 0.5, 1) both; animation-delay: calc(var(--i, 0) * 80ms + 450ms); }
+  .flow-x { animation: flow-x 0.7s linear infinite; }
+  .flow-y { animation: flow-y 0.7s linear infinite; }
+  .bar-grow { animation: bar-grow 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: calc(var(--i, 0) * 14ms + 300ms); }
+  .row-in { animation: row-in 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .flow-path { animation: flow-path 0.9s linear infinite; }
+}
+
+/* An SVG edge whose dashes march from source to target (services map). */
+.flow-path {
+  stroke-dasharray: 5 7;
+}
+
+@keyframes blink { 50% { opacity: 0.2; } }
+@keyframes lineup { from { transform: translateY(108%); } }
+@keyframes rise-in { from { opacity: 0; transform: translateY(1.1rem); } }
+@keyframes grow-x { from { transform: scaleX(0); } }
+@keyframes wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes frame-draw { from { clip-path: inset(0 50% 0 50%); opacity: 1; } to { clip-path: inset(0 0 0 0); opacity: 0; } }
+@keyframes scan { from { top: 0; opacity: 0.9; } to { top: 100%; opacity: 0; } }
+@keyframes pop { from { scale: 0; } }
+@keyframes flow-x { to { background-position-x: 12px; } }
+@keyframes flow-y { to { background-position-y: 12px; } }
+@keyframes bar-grow { from { transform: scaleY(0); } }
+@keyframes row-in { from { opacity: 0; transform: translateY(-0.4rem); } }
+@keyframes flow-path { to { stroke-dashoffset: -12; } }

@@ -1,0 +1,71 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- $np := .Values.networkPolicy }}
+{{- $v := .Values }}
+# Server pods: UI/API and ingest ports from ingressFrom (anyone when empty);
+# gossip and internal RPC only from this release's pods and the node CIDRs.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zerowatch.fullname" . }}
+  labels:
+    {{- include "zerowatch.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "zerowatch.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: [single, storage, ingest, query]
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - { port: {{ $v.ports.http }}, protocol: TCP }
+        - { port: {{ $v.ports.otlp }}, protocol: TCP }
+        - { port: {{ $v.ports.prom }}, protocol: TCP }
+        - { port: {{ $v.ports.statsd }}, protocol: UDP }
+      {{- with $np.ingressFrom }}
+      from:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ include "zerowatch.name" . }}
+              app.kubernetes.io/instance: {{ .Release.Name }}
+        {{- range $np.nodeCIDRs }}
+        - ipBlock:
+            cidr: {{ . }}
+        {{- end }}
+      ports:
+        - { port: {{ $v.ports.gossip }}, protocol: TCP }
+        - { port: {{ $v.ports.gossip }}, protocol: UDP }
+        - { port: {{ $v.ports.http }}, protocol: TCP }
+{{- if and $v.forecaster.enabled (not $v.forecaster.externalURL) }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zerowatch.fullname" . }}-forecaster
+  labels:
+    {{- include "zerowatch.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "zerowatch.selectorLabels" (dict "ctx" $ "component" "forecaster") | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ include "zerowatch.name" . }}
+              app.kubernetes.io/instance: {{ .Release.Name }}
+        {{- range $np.nodeCIDRs }}
+        - ipBlock:
+            cidr: {{ . }}
+        {{- end }}
+      ports:
+        - { port: {{ $v.forecaster.port }}, protocol: TCP }
+{{- end }}
+{{- end }}

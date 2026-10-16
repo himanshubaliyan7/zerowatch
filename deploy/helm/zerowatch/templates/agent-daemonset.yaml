@@ -1,0 +1,195 @@
+{{- if .Values.agent.enabled }}
+{{- $c := dict "ctx" $ "component" "agent" "nodeNameFrom" (ternary "spec.nodeName" "metadata.name" (eq .Values.agent.memberName "node")) "httpPort" .Values.agent.httpPort "gossipPort" .Values.agent.gossipPort }}
+{{- $a := .Values.agent }}
+{{- $m := $a.mounts }}
+# Node agent: the RedBrain supervisor (role=supervisor) on every node. It
+# discovers services, attaches the eBPF probe (or the /proc fallback), tails
+# logs, samples host metrics, and joins the gossip ring, so its writes are
+# routed to the storage owners (or published to Kafka when kafka.enabled).
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "zerowatch.fullname" . }}-agent
+  labels:
+    {{- include "zerowatch.componentLabels" $c | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "zerowatch.selectorLabels" $c | nindent 6 }}
+  updateStrategy:
+    {{- toYaml $a.updateStrategy | nindent 4 }}
+  template:
+    metadata:
+      {{- include "zerowatch.podMeta" $c | nindent 6 }}
+    spec:
+      serviceAccountName: {{ include "zerowatch.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountToken }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # Every process on the node, for discovery, the probe's PID targets and topology.
+      hostPID: true
+      hostNetwork: {{ $a.hostNetwork }}
+      {{- if $a.hostNetwork }}
+      dnsPolicy: ClusterFirstWithHostNet
+      {{- end }}
+      {{- with $a.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
+      {{- with $a.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $a.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $a.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # Root (uid 0) is required to read other processes' /proc entries and
+      # root-owned logs; everything else in the chart runs as non-root.
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+        runAsNonRoot: false
+        seccompProfile:
+          type: {{ if $a.privileged }}Unconfined{{ else }}RuntimeDefault{{ end }}
+      terminationGracePeriodSeconds: 15
+      {{- include "zerowatch.seedWait" $ | nindent 6 }}
+      containers:
+        - name: agent
+          image: {{ include "zerowatch.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --role=supervisor
+            - --host-root=/host
+            - --log-roots={{ join "," $a.logRoots }}
+            - --log-discovery={{ $a.logDiscovery }}
+            - --host-metrics={{ $a.hostMetrics }}
+            - --supervisor-interval={{ $a.interval }}
+            {{- with $.Values.extraArgs }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          env:
+            {{- include "zerowatch.env" $c | nindent 12 }}
+            - name: ZW_SUPERVISOR
+              value: "true"
+            # Host dimension = the Kubernetes node, not the pod name.
+            - name: ZW_HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: ZW_CLUSTER_SEEDS
+              value: {{ include "zerowatch.seeds" . | quote }}
+          {{- with .Values.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ $a.httpPort }}
+              protocol: TCP
+            - name: gossip-tcp
+              containerPort: {{ $a.gossipPort }}
+              protocol: TCP
+            - name: gossip-udp
+              containerPort: {{ $a.gossipPort }}
+              protocol: UDP
+          {{- include "zerowatch.probes" (dict "ctx" $ "port" "http") | nindent 10 }}
+          resources:
+            {{- toYaml $a.resources | nindent 12 }}
+          securityContext:
+            {{- if $a.privileged }}
+            privileged: true
+            {{- else }}
+            privileged: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+              add:
+                {{- toYaml $a.capabilities | nindent 16 }}
+            {{- end }}
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+            - name: proc
+              mountPath: /host/proc
+              readOnly: true
+            - name: sys
+              mountPath: /host/sys
+              readOnly: true
+            {{- if $m.hostRoot }}
+            - name: rootfs
+              mountPath: /host
+              readOnly: true
+              mountPropagation: HostToContainer
+            {{- end }}
+            {{- if $m.tracefs }}
+            - name: tracefs
+              mountPath: /sys/kernel/tracing
+              readOnly: true
+            {{- end }}
+            {{- if $m.debugfs }}
+            - name: debugfs
+              mountPath: /sys/kernel/debug
+              readOnly: true
+            {{- end }}
+            {{- if $m.varLog }}
+            - name: varlog
+              mountPath: /var/log
+              readOnly: true
+            {{- end }}
+            {{- if $m.dockerContainers }}
+            - name: dockercontainers
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+            {{- end }}
+            {{- with $a.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        - name: proc
+          hostPath:
+            path: /proc
+        - name: sys
+          hostPath:
+            path: /sys
+        {{- if $m.hostRoot }}
+        - name: rootfs
+          hostPath:
+            path: /
+        {{- end }}
+        {{- if $m.tracefs }}
+        - name: tracefs
+          hostPath:
+            path: /sys/kernel/tracing
+        {{- end }}
+        {{- if $m.debugfs }}
+        - name: debugfs
+          hostPath:
+            path: /sys/kernel/debug
+        {{- end }}
+        {{- if $m.varLog }}
+        - name: varlog
+          hostPath:
+            path: /var/log
+        {{- end }}
+        {{- if $m.dockerContainers }}
+        - name: dockercontainers
+          hostPath:
+            path: /var/lib/docker/containers
+        {{- end }}
+        {{- with $a.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+{{- end }}

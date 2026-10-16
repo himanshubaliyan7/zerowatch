@@ -1,0 +1,123 @@
+{{- if eq .Values.mode "cluster" }}
+{{- $c := dict "ctx" $ "component" "storage" }}
+{{- $s := .Values.storageNodes }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "zerowatch.storageHeadless" . }}
+  labels:
+    {{- include "zerowatch.componentLabels" $c | nindent 4 }}
+spec:
+  clusterIP: None
+  # Seeds must resolve before the pods are ready (storage-0 seeds itself).
+  publishNotReadyAddresses: true
+  selector:
+    {{- include "zerowatch.selectorLabels" $c | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.ports.http }}
+      targetPort: http
+      protocol: TCP
+    - name: gossip-tcp
+      port: {{ .Values.ports.gossip }}
+      targetPort: gossip-tcp
+      protocol: TCP
+    - name: gossip-udp
+      port: {{ .Values.ports.gossip }}
+      targetPort: gossip-udp
+      protocol: UDP
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "zerowatch.fullname" . }}-storage
+  labels:
+    {{- include "zerowatch.componentLabels" $c | nindent 4 }}
+spec:
+  serviceName: {{ include "zerowatch.storageHeadless" . }}
+  replicas: {{ $s.replicas }}
+  podManagementPolicy: {{ $s.podManagementPolicy }}
+  selector:
+    matchLabels:
+      {{- include "zerowatch.selectorLabels" $c | nindent 6 }}
+  template:
+    metadata:
+      {{- include "zerowatch.podMeta" $c | nindent 6 }}
+    spec:
+      {{- include "zerowatch.podCommon" . | nindent 6 }}
+      {{- if .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml .Values.topologySpreadConstraints | nindent 8 }}
+      {{- end }}
+      # Leave the ring cleanly (memberlist Leave) before the pod goes away.
+      terminationGracePeriodSeconds: 30
+      {{- include "zerowatch.seedWait" $ | nindent 6 }}
+      containers:
+        - name: zerowatch
+          image: {{ include "zerowatch.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --role=storage
+            {{- with $.Values.extraArgs }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          env:
+            {{- include "zerowatch.env" $c | nindent 12 }}
+            - name: ZW_CLUSTER_SEEDS
+              value: {{ include "zerowatch.seeds" . | quote }}
+            - name: ZW_SUPERVISOR
+              value: "false"
+          {{- with .Values.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            {{- include "zerowatch.containerPorts" (dict "ctx" $ "gossip" true) | nindent 12 }}
+          {{- include "zerowatch.probes" (dict "ctx" $ "port" "http") | nindent 10 }}
+          resources:
+            {{- toYaml $s.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- if not $s.persistence.enabled }}
+        - name: data
+          emptyDir: {}
+        {{- end }}
+  {{- if $s.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "zerowatch.selectorLabels" $c | nindent 10 }}
+      spec:
+        accessModes:
+          {{- toYaml $s.persistence.accessModes | nindent 10 }}
+        {{- with $s.persistence.storageClass }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ $s.persistence.size }}
+  {{- end }}
+{{- if $s.pdb.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "zerowatch.fullname" . }}-storage
+  labels:
+    {{- include "zerowatch.componentLabels" $c | nindent 4 }}
+spec:
+  maxUnavailable: {{ $s.pdb.maxUnavailable }}
+  selector:
+    matchLabels:
+      {{- include "zerowatch.selectorLabels" $c | nindent 6 }}
+{{- end }}
+{{- end }}

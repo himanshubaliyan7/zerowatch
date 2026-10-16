@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ZeroWatch · wave 3 mock-up (forecast + reports)</title>
+<script>try{if(localStorage.getItem("zw-mock-theme")==="dark"||(!localStorage.getItem("zw-mock-theme")&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch{}</script>
+<style>
+@font-face{font-family:"DM Sans";font-weight:400 600;font-display:swap;src:url("../../public/fonts/dm-sans-v17-bu0-K4.woff2") format("woff2")}
+@font-face{font-family:"JetBrains Mono";font-weight:400 500;font-display:swap;src:url("../../public/fonts/jetbrains-mono-v24-PxDcwg.woff2") format("woff2")}
+@font-face{font-family:"Space Grotesk";font-weight:300 700;font-display:swap;src:url("../../public/fonts/space-grotesk-v22-PbF4Cw.woff2") format("woff2")}
+:root{--bg:oklch(.95 .014 85);--fg:oklch(.17 0 0);--muted:oklch(.915 .018 85);--mfg:oklch(.42 .01 85);--border:oklch(.17 0 0/.3);--hair:oklch(.17 0 0/.11);--pos:oklch(.56 .14 152);--warn:oklch(.66 .16 62);--crit:oklch(.54 .2 27)}
+.dark{--bg:oklch(.145 0 0);--fg:oklch(.95 .014 85);--muted:oklch(.195 0 0);--mfg:oklch(.74 .008 85);--border:oklch(.95 .014 85/.24);--hair:oklch(.95 .014 85/.09);--pos:oklch(.68 .15 152);--warn:oklch(.75 .16 62);--crit:oklch(.66 .19 25)}
+*{box-sizing:border-box;border-radius:0}
+html,body{overflow-x:clip}
+body{margin:0;background:var(--bg);color:var(--fg);font:400 .95rem/1.6 "DM Sans",system-ui,sans-serif;padding-bottom:3.5rem}
+.micro{font:500 .66rem/1.5 "JetBrains Mono",ui-monospace,monospace;text-transform:uppercase;letter-spacing:.12em}
+.muted{color:var(--mfg)}
+.wrap{max-width:115rem;margin:0 auto;padding:0 1rem}
+@media(min-width:40rem){.wrap{padding:0 2rem}}
+header.top{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--hair)}
+header.top .wrap{display:flex;gap:2rem;align-items:center;flex-wrap:wrap;padding-top:.8rem;padding-bottom:.8rem}
+.brand{font:600 .8rem "Space Grotesk",sans-serif;text-transform:uppercase;letter-spacing:.34em}
+nav{display:flex;gap:1.2rem;overflow-x:auto}
+nav a{color:var(--mfg);text-decoration:none;padding:.3rem 0;border-bottom:1px solid transparent}
+nav a.on{color:var(--fg);border-color:var(--fg)}
+.note{border:1px dashed var(--border);padding:.8rem 1rem;margin:1.5rem 0 0}
+.mega{font:600 clamp(2.75rem,9.5vw,8rem)/.84 "Space Grotesk",sans-serif;text-transform:uppercase;letter-spacing:-.02em;margin:2.5rem 0 1rem;overflow-wrap:anywhere}
+.title{font:600 clamp(2.25rem,6vw,3.75rem)/.9 "Space Grotesk",sans-serif;text-transform:uppercase;letter-spacing:-.01em;margin:2.5rem 0 1rem;overflow-wrap:anywhere}
+.lead{max-width:54ch;font-size:clamp(1rem,1.35vw,1.3rem);line-height:1.35;margin:0 0 1.5rem}
+.sh{display:flex;justify-content:space-between;gap:.5rem 1.2rem;flex-wrap:wrap;align-items:baseline;border-bottom:1px solid var(--border);padding-bottom:.6rem;margin:3rem 0 1rem}
+.btn{display:inline-flex;align-items:center;gap:.4rem;border:1px solid var(--border);background:none;color:inherit;padding:.5rem .75rem;cursor:pointer}
+.btn:hover{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.btn.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+select{appearance:none;border:1px solid var(--border);background:var(--bg);color:var(--fg);padding:.5rem 2rem .5rem .75rem}
+.frame{border:1px solid var(--border);position:relative}
+svg text{font:500 10px "JetBrains Mono",monospace;fill:var(--mfg);text-transform:uppercase}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);border-top:1px solid var(--border);border-left:1px solid var(--border)}
+@media(min-width:64rem){.stats{grid-template-columns:repeat(5,1fr)}}
+.stat{border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:1rem 1.25rem;transition:background .2s}
+.stat:hover{background:var(--fg);color:var(--bg)}.stat:hover .muted{color:inherit;opacity:.7}
+.num{font:600 clamp(2rem,4.5vw,4rem)/.95 "Space Grotesk",sans-serif;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:.5rem}
+.sq{display:inline-block;width:.6rem;height:.6rem;margin-right:.45rem}
+.t-crit{color:var(--crit)}.t-warn{color:var(--warn)}.t-pos{color:var(--pos)}
+.b-crit{background:var(--crit)}.b-warn{background:var(--warn)}.b-pos{background:var(--pos)}
+.none{outline:1px dashed var(--border);outline-offset:-1px;background:repeating-linear-gradient(45deg,transparent 0 3px,var(--hair) 3px 4px)}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th{text-align:left;font:500 .66rem "JetBrains Mono",monospace;text-transform:uppercase;letter-spacing:.12em;color:var(--mfg);padding:.4rem .9rem .4rem 0;font-weight:500}
+td{border-top:1px solid var(--hair);padding:.6rem .9rem .6rem 0;white-space:nowrap}
+.r{text-align:right}
+.scroll{overflow-x:auto;position:relative}
+.grid2{display:grid;gap:2rem}
+@media(min-width:64rem){.grid2{grid-template-columns:1fr 1fr}}
+.panel{border:1px solid var(--border);padding:1rem 1.25rem}
+.seg{display:inline-flex;border:1px solid var(--border)}
+.seg button{border:0;border-right:1px solid var(--border);background:none;color:inherit;padding:.5rem .8rem;cursor:pointer}
+.seg button:last-child{border-right:0}.seg button.on{background:var(--fg);color:var(--bg)}
+.status{position:fixed;inset:auto 0 0 0;border-top:1px solid var(--hair);background:var(--bg);height:2.5rem;display:flex;align-items:center}
+.dot{display:inline-block;width:.45rem;height:.45rem;background:var(--fg);margin-right:.5rem;animation:blink 1.2s steps(2) infinite}
+.label-tag{border:1px solid var(--fg);padding:.1rem .35rem}
+section.mock{border-top:6px double var(--border);margin-top:4rem;padding-top:1rem}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion:no-preference){
+.rise{animation:rise .9s cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--i,0)*60ms)}
+.wipe{animation:wipe 1.2s cubic-bezier(.2,.7,.2,1) both}
+.grow{transform-origin:left;animation:grow .9s cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--i,0)*60ms + 200ms)}
+.pop{animation:pop .5s cubic-bezier(.3,1.6,.5,1) both;animation-delay:1s;transform-box:fill-box;transform-origin:center}
+}
+@keyframes rise{from{opacity:0;transform:translateY(1.1rem)}}
+@keyframes wipe{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+@keyframes grow{from{transform:scaleX(0)}}
+@keyframes pop{from{transform:scale(0)}}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <span class="brand">ZeroWatch</span>
+  <nav class="micro"><a>Overview</a><a>Map</a><a>Logs</a><a>Traces</a><a>Dashboards</a><a class="on" href="#explore">Explore</a><a href="#alarms">Alarms</a><a href="#reports">Reports</a></nav>
+  <button class="btn micro" style="margin-left:auto" onclick="toggleTheme()">Theme</button>
+</div></header>
+
+<main class="wrap">
+<p class="note micro muted">Mock-up for review, made with simulated data. Three screens: <b>A</b> Explore with forecast · <b>B</b> Predictive alarm in Alarm Studio · <b>C</b> Reports view. Nothing here is wired to the API yet.</p>
+
+<!-- ============ A. EXPLORE ============ -->
+<section class="mock" id="explore">
+  <span class="micro muted">A · Explore → forecast</span>
+  <h1 class="title rise">checkout · p99 latency</h1>
+  <div class="row" style="justify-content:space-between;margin-bottom:1rem">
+    <div class="row">
+      <span class="micro muted">Forecast</span>
+      <div class="seg micro" id="fh"><button data-h="0">Off</button><button data-h="60" class="on">1h</button><button data-h="360">6h</button><button data-h="1440">24h</button></div>
+      <select class="micro" id="fm"><option>auto</option><option>holt-winters</option><option>stl</option><option>holt</option><option>model</option></select>
+    </div>
+    <div class="row"><button class="btn micro">Alarm on forecast</button><button class="btn micro">Add to dashboard</button></div>
+  </div>
+  <div class="frame"><svg id="plotA" viewBox="0 0 1200 340" width="100%" preserveAspectRatio="none" style="display:block;height:340px"></svg></div>
+  <div class="row micro muted" style="justify-content:space-between;margin-top:.6rem">
+    <div class="row" style="gap:1.2rem">
+      <span><svg width="22" height="6"><line x1="0" x2="22" y1="3" y2="3" stroke="currentColor" stroke-width="2" style="color:var(--fg)"/></svg> observed</span>
+      <span><svg width="22" height="6"><line x1="0" x2="22" y1="3" y2="3" stroke="currentColor" stroke-width="2" stroke-dasharray="5 3" style="color:var(--fg)"/></svg> forecast</span>
+      <span><svg width="22" height="8"><rect width="22" height="8" fill="currentColor" opacity=".12" style="color:var(--fg)"/></svg> 80 % range</span>
+      <span><svg width="22" height="6"><line x1="0" x2="22" y1="3" y2="3" stroke="currentColor" stroke-dasharray="2 3" style="color:var(--fg)"/></svg> threshold 250 ms</span>
+    </div>
+    <span id="methodA">method holt · holt-winters needs 2 days of history, have 35 min</span>
+  </div>
+  <p class="lead" style="margin-top:1.5rem"><span class="sq b-warn" aria-hidden="true"></span><b>Forecast crosses 250 ms at 15:42</b>, in 38 minutes. The 80 % range reaches it from 15:20.</p>
+</section>
+
+<!-- ============ B. ALARM STUDIO ============ -->
+<section class="mock" id="alarms">
+  <span class="micro muted">B · Alarm Studio → predictive</span>
+  <h1 class="title rise">Disk will fill</h1>
+  <div class="grid2">
+    <div class="panel">
+      <div class="micro muted" style="margin-bottom:.6rem">Evaluate</div>
+      <div class="seg micro" id="ev"><button>Observed value</button><button class="on">Forecast</button></div>
+      <p style="margin:.9rem 0 .6rem">Fire when the <b>forecast for the next</b>
+        <select class="micro"><option>15 min</option><option selected>1 hour</option><option>6 hours</option><option>24 hours</option></select>
+        is <b>greater than</b> <span class="label-tag micro">90 %</span> for <b>3 of 5</b> periods.</p>
+      <p class="micro muted" style="margin:0">Uses the model service when configured, otherwise the built-in forecast (Holt-Winters with two days of history, damped Holt before that). Too little history counts as missing data.</p>
+    </div>
+    <div class="panel">
+      <div class="micro muted" style="margin-bottom:.6rem">Last 24 h replayed</div>
+      <svg viewBox="0 0 600 60" width="100%" style="display:block">
+        <g id="replay"></g>
+      </svg>
+      <div class="row micro muted" style="gap:1rem;margin-top:.6rem">
+        <span><span class="sq b-crit" aria-hidden="true"></span>alarm</span><span><span class="sq b-pos" aria-hidden="true"></span>ok</span><span><span class="sq none" aria-hidden="true"></span>no data</span>
+        <span style="margin-left:auto">would have fired 2× · first 4 h 10 min before the observed alarm</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ C. REPORTS ============ -->
+<section class="mock" id="reports">
+  <span class="micro muted">C · Reports</span>
+  <div class="row" style="justify-content:space-between;margin-top:1rem">
+    <span class="micro muted">Report · Oct 15 15:00 → Oct 16 15:00 UTC</span>
+    <div class="row">
+      <div class="seg micro"><button class="on">24h</button><button>7d</button><button>30d</button></div>
+      <button class="btn micro">Open HTML ↗</button><button class="btn micro">Send now</button>
+    </div>
+  </div>
+  <h1 class="mega"><span style="display:block" class="rise">Last</span><span style="display:block;opacity:.55" class="rise" data-i="1">24 hours.</span></h1>
+  <p class="lead rise" style="--i:2">Served 1.2M requests at a 0.84 % error rate, p99 388 ms. <b>search</b> got slower: p99 up 31 % on the day before. Alarms fired 4 times. <b>"checkout · p99 latency high"</b> is forecast to cross 250 ms at 15:42.</p>
+  <div class="stats">
+    <div class="stat rise" style="--i:1"><div class="micro muted">Requests</div><div class="num">1.2M</div></div>
+    <div class="stat rise" style="--i:2"><div class="micro muted">Error rate</div><div class="num">0.84%</div></div>
+    <div class="stat rise" style="--i:3"><div class="micro muted">p50</div><div class="num">30 ms</div></div>
+    <div class="stat rise" style="--i:4"><div class="micro muted">p99</div><div class="num">388 ms</div></div>
+    <div class="stat rise" style="--i:5"><div class="micro muted">Good periods</div><div class="num">99.3%</div></div>
+  </div>
+
+  <div class="sh"><span class="micro">Runway</span><span class="micro muted">when each alarm threshold is forecast to be crossed · next 24 h</span></div>
+  <div class="frame" style="padding:0 1rem"><svg id="runway" viewBox="0 0 1200 230" width="100%" style="display:block"></svg></div>
+
+  <div class="grid2">
+    <div>
+      <div class="sh"><span class="micro">Services</span><span class="micro muted">p99 change vs previous 24 h</span></div>
+      <div class="scroll"><table id="svc"></table></div>
+    </div>
+    <div>
+      <div class="sh"><span class="micro">Alarms</span><span class="micro muted">fired · minutes in alarm</span></div>
+      <div id="alarmRows"></div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div>
+      <div class="sh"><span class="micro">Anomalies</span><span class="micro muted">outside the robust STL band</span></div>
+      <div class="scroll"><table>
+        <tr><th>When</th><th>Service</th><th>Metric</th><th class="r">Value</th><th class="r">Expected</th></tr>
+        <tr><td>Oct 16 14:05</td><td>search</td><td>Latency p99</td><td class="r t-crit">912</td><td class="r muted">310 – 470</td></tr>
+        <tr><td>Oct 16 09:40</td><td>payments</td><td>Requests</td><td class="r t-crit">42</td><td class="r muted">180 – 260</td></tr>
+        <tr><td>Oct 15 22:15</td><td>checkout</td><td>Latency p99</td><td class="r t-crit">1,204</td><td class="r muted">280 – 420</td></tr>
+      </table></div>
+    </div>
+    <div>
+      <div class="sh"><span class="micro">Slowest traces</span><span class="micro muted">open in Traces</span></div>
+      <div class="scroll"><table>
+        <tr><th>Started</th><th>Root</th><th class="r">Duration</th><th class="r">Spans</th></tr>
+        <tr><td>14:05:12</td><td>search · GET /</td><td class="r">3,412 ms</td><td class="r">9</td></tr>
+        <tr><td>12:51:40</td><td>checkout · POST /api</td><td class="r">3,050 ms</td><td class="r t-crit">11 · 2 err</td></tr>
+        <tr><td>22:15:03</td><td>checkout · POST /api</td><td class="r">2,980 ms</td><td class="r">11</td></tr>
+      </table></div>
+    </div>
+  </div>
+  <p class="micro muted" style="margin-top:2rem">p50 and p99 are request-weighted means of per-period percentiles; a good period has an error rate below 5 %.</p>
+</section>
+</main>
+<div class="status micro muted"><div class="wrap" style="width:100%"><span class="dot"></span>Mock-up · simulated data</div></div>
+
+<script>
+function toggleTheme(){const d=document.documentElement.classList.toggle("dark");try{localStorage.setItem("zw-mock-theme",d?"dark":"light")}catch{}}
+const NS="http://www.w3.org/2000/svg";
+const el=(t,a,p)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);p&&p.appendChild(e);return e};
+let s=11;const rnd=()=>((s=(s*1664525+1013904223)>>>0)/2**32);
+
+/* A: observed 90 min + forecast */
+function drawA(h){
+  const svg=document.getElementById("plotA");svg.innerHTML="";
+  const W=1200,H=340,pl=48,pr=16,pt=16,pb=28;
+  const obsN=90, total=obsN+(h?Math.min(h,360)/ (h>360?4:1):30);
+  const obs=[];for(let i=0;i<obsN;i++)obs.push(150+i*0.55+18*Math.sin(i/7)+rnd()*22);
+  const fN=h?Math.round(h<=60?60:h<=360?120:180):0;
+  const step=h?h/fN:1;
+  const last=obs.at(-1);const fc=[];for(let k=1;k<=fN;k++){const m=last+0.55*k*step*0.98;const w=8+Math.sqrt(k*step)*4.2;fc.push([m,m-w,m+w])}
+  const N=obsN+fN, x=i=>pl+(i/(Math.max(N,obsN+30)-1))*(W-pl-pr);
+  const ymax=Math.max(300,...fc.map(f=>f[2]),...obs)*1.05, y=v=>pt+(1-v/ymax)*(H-pt-pb);
+  for(let g=0;g<=4;g++){const v=ymax*g/4;el("line",{x1:pl,x2:W-pr,y1:y(v),y2:y(v),stroke:"var(--hair)"},svg);el("text",{x:4,y:y(v)+3},svg).textContent=Math.round(v)}
+  const nowX=x(obsN-1);
+  el("line",{x1:nowX,x2:nowX,y1:pt,y2:H-pb,stroke:"var(--border)"},svg);
+  el("text",{x:nowX+5,y:pt+10},svg).textContent="now";
+  ["-90m","-60m","-30m"].forEach((l,i)=>el("text",{x:x(i*30)-4,y:H-8},svg).textContent=l);
+  if(fN){el("text",{x:x(N-1)-40,y:H-8},svg).textContent="+"+(h>=60?h/60+"h":h+"m");
+    const top=fc.map((f,k)=>`${k?"L":"M"}${x(obsN+k)} ${y(f[2])}`).join("");
+    const bot=fc.map((f,k)=>[k,f]).reverse().map(([k,f])=>`L${x(obsN+k)} ${y(f[1])}`).join("");
+    el("path",{d:`M${nowX} ${y(last)}`+top.replace(/^M/,"L")+bot+"Z",fill:"var(--fg)","fill-opacity":".12",class:"wipe"},svg);
+    el("path",{d:`M${nowX} ${y(last)}`+fc.map((f,k)=>`L${x(obsN+k)} ${y(f[0])}`).join(""),fill:"none",stroke:"var(--fg)","stroke-width":2,"stroke-dasharray":"6 4",class:"wipe"},svg);
+  }
+  el("line",{x1:pl,x2:W-pr,y1:y(250),y2:y(250),stroke:"var(--fg)","stroke-opacity":".75","stroke-dasharray":"2 3"},svg);
+  el("path",{d:obs.map((v,i)=>`${i?"L":"M"}${x(i)} ${y(v)}`).join(""),fill:"none",stroke:"var(--fg)","stroke-width":2,class:"wipe"},svg);
+  const ci=fc.findIndex(f=>f[0]>250);
+  if(ci>=0){const cx=x(obsN+ci),cy=y(250);el("rect",{x:cx-4,y:cy-4,width:8,height:8,fill:"var(--warn)",class:"pop"},svg);el("text",{x:cx+8,y:cy-8},svg).textContent="crosses 15:42"}
+}
+document.querySelectorAll("#fh button").forEach(b=>b.onclick=()=>{document.querySelectorAll("#fh button").forEach(x=>x.classList.toggle("on",x===b));drawA(+b.dataset.h)});
+document.querySelectorAll(".seg").forEach(g=>g.id!=="fh"&&g.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>g.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)))));
+drawA(60);
+
+/* B: replay strip */
+(()=>{const g=document.getElementById("replay");for(let i=0;i<96;i++){const st=i<6?"none":(i>40&&i<47)||(i>78&&i<84)?"crit":"pos";
+  const r=el("rect",{x:i*6.25,y:8,width:5.25,height:44},g);if(st==="none"){r.setAttribute("fill","none");r.setAttribute("stroke","var(--border)");r.setAttribute("stroke-dasharray","2 2")}else r.setAttribute("fill",`var(--${st})`)}})();
+
+/* C: runway */
+(()=>{const svg=document.getElementById("runway");const rows=[
+  ["checkout · p99 latency high","Latency p99 > 250 ms",0.03,"15:42"],
+  ["disk will fill · db-1","DiskUsed % > 90",0.46,"Oct 17 02:10"],
+  ["payments · p99 latency high","Latency p99 > 175 ms",0.81,"Oct 17 10:30"],
+  ["inventory · 5xx errors","Errors Sum > 25",null,""],
+  ["search · p99 latency high","Latency p99 > 480 ms",null,""]];
+  const L=330,R=1180,top=28,rh=38;
+  for(let i=0;i<=4;i++){const xx=L+(R-L)*i/4;el("line",{x1:xx,x2:xx,y1:top-8,y2:top+rows.length*rh-6,stroke:"var(--hair)"},svg);el("text",{x:xx-(i?20:0),y:14},svg).textContent=i?`+${i*6}h`:"now"}
+  rows.forEach(([name,metric,f,at],i)=>{const yy=top+i*rh+12;
+    el("text",{x:0,y:yy-2,style:"fill:var(--fg);font-size:11px"},svg).textContent=name;
+    el("text",{x:0,y:yy+12},svg).textContent=metric;
+    if(f==null){el("line",{x1:L,x2:R,y1:yy+3,y2:yy+3,stroke:"var(--border)","stroke-dasharray":"3 4"},svg);
+      el("text",{x:R-150,y:yy-4},svg).textContent="clear for 24 h";}
+    else{const xx=L+(R-L)*f;const ln=el("line",{x1:L,x2:xx,y1:yy+3,y2:yy+3,stroke:"var(--fg)","stroke-width":2,class:"grow",style:`--i:${i}`},svg);
+      el("line",{x1:xx,x2:R,y1:yy+3,y2:yy+3,stroke:"var(--hair)"},svg);
+      el("rect",{x:xx-5,y:yy-2,width:10,height:10,fill:f<0.25?"var(--crit)":"var(--warn)",class:"pop"},svg);
+      el("text",{x:Math.min(xx+10,R-110),y:yy-4,style:"fill:var(--fg)"},svg).textContent=`crosses ${at}`;}
+  });})();
+
+/* C: services table + alarm rows */
+(()=>{const rows=[["auth","110.2k","0.83%",420,2],["checkout","98.4k","1.12%",388,-4],["search","84.0k","0.61%",471,31],["catalog","70.1k","0.40%",210,-24],["payments","61.9k","2.31%",305,8],["inventory","46.4k","5.40%",190,1]];
+  const t=document.getElementById("svc");t.innerHTML=`<tr><th>Service</th><th class="r">Requests</th><th class="r">Errors</th><th class="r">p99</th><th class="r">Change</th></tr>`+
+  rows.map(([n,r,e,p,c])=>{const ev=parseFloat(e);const et=ev>=5?"t-crit":ev>=1?"t-warn":"";const ct=c>20?"t-crit":c<-20?"t-pos":"";
+    return `<tr><td>${n}</td><td class="r">${r}</td><td class="r ${et}">${e}</td><td class="r">${p} ms</td><td class="r ${ct}">${c>0?"▲ +":c<0?"▼ ":""}${c}%</td></tr>`}).join("");
+  const al=[["checkout · p99 latency high","ALARM",2,47],["inventory · 5xx errors","OK",1,12],["payments · p99 latency high","OK",1,6],["search · p99 latency high","INSUFFICIENT_DATA",0,0]];
+  document.getElementById("alarmRows").innerHTML=al.map(([n,st,f,m],i)=>{const tone=st==="ALARM"?"b-crit":st==="OK"?"b-pos":"none";
+    return `<div style="border-top:1px solid var(--hair);padding:.6rem 0;display:grid;grid-template-columns:1fr auto;gap:.2rem 1rem">
+      <span>${n}</span><span class="micro"><span class="sq ${tone}" aria-hidden="true"></span>${st.replace("_"," ")}</span>
+      <span style="display:flex;align-items:center;gap:.6rem"><span class="grow" style="--i:${i};display:inline-block;height:6px;width:${Math.max(2,m*2.2)}px;background:var(--fg)"></span><span class="micro muted">${m} min</span></span>
+      <span class="micro muted">fired ${f}×</span></div>`}).join("");})();
+</script>
+</body>
+</html>

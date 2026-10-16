@@ -1,0 +1,66 @@
+ZeroWatch {{ .Chart.AppVersion }} installed as "{{ .Release.Name }}" in namespace {{ .Release.Namespace }} (mode={{ .Values.mode }}).
+{{- $fn := include "zerowatch.fullname" . }}
+{{- $ns := .Release.Namespace }}
+
+UI and API:
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}/
+{{- end }}
+{{- else }}
+  kubectl -n {{ $ns }} port-forward svc/{{ $fn }} {{ .Values.ports.http }}:{{ .Values.ports.http }}
+  open http://localhost:{{ .Values.ports.http }}/   (health: /healthz, stats: /api/v1/stats, cluster: /api/v1/cluster)
+{{- end }}
+
+Send data to (in-cluster):
+  OTLP/HTTP      http://{{ $fn }}-ingest.{{ $ns }}.svc:{{ .Values.ports.otlp }}   (/v1/metrics, /v1/logs, /v1/traces)
+  Prom remote    http://{{ $fn }}-ingest.{{ $ns }}.svc:{{ .Values.ports.prom }}/api/v1/write
+  CloudWatch     http://{{ $fn }}-ingest.{{ $ns }}.svc:{{ .Values.ports.http }}/cloudwatch
+{{- if .Values.statsdService.enabled }}
+  StatsD (UDP)   {{ $fn }}-statsd.{{ $ns }}.svc:{{ .Values.ports.statsd }}
+{{- end }}
+{{- if eq .Values.mode "cluster" }}
+
+Cluster: {{ .Values.storageNodes.replicas }} storage nodes behind {{ include "zerowatch.storageHeadless" . }}; seeds:
+  {{ include "zerowatch.seeds" . }}
+{{- end }}
+{{- if .Values.agent.enabled }}
+
+Node agent DaemonSet: {{ $fn }}-agent (role=supervisor, hostPID{{ if .Values.agent.hostNetwork }}, hostNetwork on :{{ .Values.agent.httpPort }}/:{{ .Values.agent.gossipPort }}{{ end }}{{ if .Values.agent.privileged }}, privileged{{ end }}).
+{{- end }}
+{{- if .Values.secrets.existingSecret }}
+
+Secrets come from {{ .Values.secrets.existingSecret }}; make sure it has key {{ .Values.secrets.keys.clusterSecret }}{{ if .Values.agent.enabled }} (required by the agents){{ end }}.
+{{- else }}
+{{- if not (index .Values.secrets.values .Values.secrets.keys.apiKeys) }}
+
+WARNING: no API keys: auth is OFF (dev only). Set secrets.existingSecret with key {{ .Values.secrets.keys.apiKeys }}.
+{{- end }}
+{{- if .Values.secrets.values }}
+
+WARNING: secrets.values puts secrets in the release; use secrets.existingSecret outside dev.
+{{- end }}
+{{- end }}
+{{- if and (not .Values.metadata.dsn) (not .Values.secrets.existingSecret) }}
+{{- if or .Values.agent.enabled (and (eq .Values.mode "cluster") (or (gt (int .Values.query.replicas) 1) .Values.query.autoscaling.enabled)) }}
+
+WARNING: metadata is SQLite per pod. Auto-dashboards and alarms made by the agents (and edits on other
+         query replicas) are not visible in the UI. Set metadata.dsn or secret key {{ .Values.secrets.keys.metadataDSN }} to a shared postgres:// DSN.
+{{- end }}
+{{- end }}
+{{- if and (eq .Values.mode "cluster") (or (gt (int .Values.query.replicas) 1) .Values.query.autoscaling.enabled) }}
+
+WARNING: every query replica runs the alarm engine and report scheduler; notifications are sent once per replica.
+{{- end }}
+{{- if and (eq .Values.storage.backend "clickhouse") (eq .Values.mode "cluster") (gt (int .Values.storageNodes.replicas) 1) }}
+
+WARNING: storage.backend=clickhouse with {{ .Values.storageNodes.replicas }} storage replicas: they share one database, so fan-out reads repeat rows. Use 1 replica or mode=single.
+{{- end }}
+{{- if .Values.serviceMonitor.enabled }}
+
+NOTE: ZeroWatch does not expose Prometheus metrics at {{ .Values.serviceMonitor.path }} yet; the ServiceMonitor will report the target down.
+{{- end }}
+{{- if or .Values.oidc.enabled .Values.tiering.enabled }}
+
+NOTE: oidc / tiering values are placeholders (coming in wave 4); wire them with extraArgs / extraEnv for now.
+{{- end }}

@@ -1,0 +1,3 @@
+node_modules/
+*.log
+# dist/ is committed on purpose: the Go binary embeds it (web/embed.go).

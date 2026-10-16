@@ -1,0 +1,16 @@
+apiVersion: v2
+name: zerowatch
+description: ZeroWatch, self-configuring observability (metrics, logs, traces, alarms, forecasts, UI) with a node agent DaemonSet.
+type: application
+version: 0.1.0
+appVersion: "0.4.0"
+kubeVersion: ">=1.25.0-0"
+keywords:
+  - observability
+  - monitoring
+  - cloudwatch
+  - ebpf
+  - otlp
+home: https://github.com/zerowatch/zerowatch
+sources:
+  - https://github.com/zerowatch/zerowatch

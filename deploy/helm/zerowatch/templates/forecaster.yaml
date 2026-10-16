@@ -1,0 +1,101 @@
+{{- if and .Values.forecaster.enabled (not .Values.forecaster.externalURL) }}
+{{- $c := dict "ctx" $ "component" "forecaster" }}
+{{- $f := .Values.forecaster }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "zerowatch.fullname" . }}-forecaster
+  labels:
+    {{- include "zerowatch.componentLabels" $c | nindent 4 }}
+spec:
+  replicas: {{ $f.replicas }}
+  selector:
+    matchLabels:
+      {{- include "zerowatch.selectorLabels" $c | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "zerowatch.selectorLabels" $c | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "zerowatch.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml $f.podSecurityContext | nindent 8 }}
+      {{- with $f.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $f.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $f.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: forecaster
+          image: "{{ $f.image.repository }}:{{ $f.image.tag | default $f.model }}"
+          imagePullPolicy: {{ $f.image.pullPolicy }}
+          env:
+            - name: ZW_MODEL
+              value: {{ $f.model | quote }}
+            - name: ZW_FORECASTER_ADDR
+              value: "0.0.0.0:{{ $f.port }}"
+            - name: ZW_LOG_LEVEL
+              value: {{ .Values.log.level | upper | quote }}
+            # The model was downloaded at build time; never reach the Hub.
+            - name: HF_HUB_OFFLINE
+              value: "1"
+            - name: TRANSFORMERS_OFFLINE
+              value: "1"
+            - name: HOME
+              value: /tmp
+          ports:
+            - name: http
+              containerPort: {{ $f.port }}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          resources:
+            {{- toYaml $f.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml $f.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "zerowatch.fullname" . }}-forecaster
+  labels:
+    {{- include "zerowatch.componentLabels" $c | nindent 4 }}
+spec:
+  selector:
+    {{- include "zerowatch.selectorLabels" $c | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ $f.port }}
+      targetPort: http
+      protocol: TCP
+{{- end }}

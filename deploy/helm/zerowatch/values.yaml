@@ -1,0 +1,359 @@
+# ZeroWatch Helm chart values. Every ZeroWatch setting is a flag with a ZW_*
+# env override (internal/config/config.go); the chart sets the env vars and
+# leaves anything it doesn't model to extraArgs / extraEnv.
+
+# single:  one Deployment, role=all (ingest + query + storage + UI), one PVC.
+# cluster: storage StatefulSet (role=storage, gossip ring), ingest and query
+#          Deployments, all joined through memberlist.
+mode: single
+
+nameOverride: ""
+fullnameOverride: ""
+clusterDomain: cluster.local
+
+image:
+  repository: zerowatch
+  # Defaults to .Chart.AppVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  # The server never calls the Kubernetes API.
+  automountToken: false
+
+# --- process settings shared by every component -----------------------------
+log:
+  level: info        # ZW_LOG_LEVEL: debug|info|warn|error
+  json: true         # ZW_LOG_JSON
+# Synthetic RED/log generator (ZW_GENERATE). Demo only; off in Kubernetes.
+generator:
+  enabled: false
+  services: 6
+retention:
+  raw: 6h            # ZW_RAW_RETENTION (memory engine)
+  rollup: 360h       # ZW_ROLLUP_RETENTION (15 days)
+limits:
+  maxSeries: 200000
+  maxLogEvents: 200000
+  rateLimitRPS: 200
+  rateLimitBurst: 400
+corsOrigins: []
+ports:
+  http: 8080         # UI, JSON API, CloudWatch-compatible endpoint (/cloudwatch)
+  otlp: 4318         # OTLP/HTTP (/v1/metrics, /v1/logs, /v1/traces)
+  prom: 8428         # Prometheus remote write (/api/v1/write)
+  statsd: 8125       # StatsD (UDP)
+  gossip: 7946       # memberlist (TCP + UDP)
+
+# Storage backend. memory = the built-in Gorilla engine (data lives in RAM,
+# the PVC holds the SQLite metadata). clickhouse = an external ClickHouse.
+# With clickhouse use mode=single (or storage.replicas=1): every storage
+# replica would point at the same database and fan-out reads would count
+# rows once per replica.
+storage:
+  backend: memory
+  clickhouse:
+    url: http://clickhouse:8123
+    database: zerowatch
+    # ZW_CLICKHOUSE_USER / ZW_CLICKHOUSE_PASSWORD come from the secret
+    # (keys clickhouseUser / clickhousePassword).
+
+# Commit log between ingest and storage. Optional external Kafka/Redpanda
+# (no subchart). Only role=all/storage consume; the others only publish.
+kafka:
+  enabled: false
+  brokers: []        # e.g. ["redpanda-0.redpanda:9092"]
+  topic: zerowatch-ingest
+
+# Metadata store (dashboards, alarms, saved queries). Empty = SQLite in the
+# pod's data dir. Set a shared postgres:// DSN (here or as secret key
+# metadataDSN) whenever more than one pod must see the same dashboards:
+# query replicas > 1, and the agent DaemonSet (the supervisor writes its
+# auto-dashboards and alarms to its own metadata store).
+metadata:
+  dsn: ""
+
+# Scheduled reports. Targets usually hold webhook URLs, so put them in the
+# secret (key reportTargets); `targets` here is for non-secret ones like "log".
+reports:
+  every: "0"         # e.g. 24h; 0 disables
+  range: 24h         # 24h|7d|30d
+  targets: []
+
+# Secrets. Point existingSecret at a Secret you manage; every key is optional,
+# but set clusterSecret there (the agent DaemonSet needs it). With no
+# existingSecret, the chart creates a Secret from `values` (dev only: the values
+# end up in the release) and generates clusterSecret when it isn't given.
+secrets:
+  existingSecret: ""
+  keys:
+    apiKeys: apiKeys                    # ZW_API_KEYS "key:tenant,..."
+    awsCredentials: awsCredentials      # ZW_AWS_CREDENTIALS "AKID:SECRET:tenant,..." (SigV4 for /cloudwatch)
+    clusterSecret: clusterSecret        # ZW_CLUSTER_SECRET (protects /internal/v1/*)
+    metadataDSN: metadataDSN            # ZW_METADATA_DSN
+    clickhouseUser: clickhouseUser      # ZW_CLICKHOUSE_USER
+    clickhousePassword: clickhousePassword  # ZW_CLICKHOUSE_PASSWORD
+    reportTargets: reportTargets        # ZW_REPORT_TARGETS
+    awsAccessKeyId: awsAccessKeyId      # AWS_ACCESS_KEY_ID (SNS alarm actions)
+    awsSecretAccessKey: awsSecretAccessKey  # AWS_SECRET_ACCESS_KEY
+    awsSessionToken: awsSessionToken    # AWS_SESSION_TOKEN
+  values: {}
+  #  apiKeys: "change-me-to-a-long-key:1"
+  #  clusterSecret: "a-long-random-string"
+
+# --- coming in wave 4 --------------------------------------------------------
+# Placeholders only: the chart renders nothing from these yet. Until the flags
+# land, wire them by hand with extraArgs / extraEnv.
+oidc:
+  enabled: false     # coming in wave 4: generic OIDC (discovery, auth code + PKCE) + RBAC viewer/editor/admin
+  issuerURL: ""
+  clientID: ""
+  # clientSecret from existingSecret
+  rolesClaim: ""
+tiering:
+  enabled: false     # coming in wave 4: S3/MinIO tiering + per-tenant retention
+  bucket: ""
+  endpoint: ""
+
+# Appended to every ZeroWatch container (not the forecaster).
+extraArgs: []
+extraEnv: []
+extraEnvFrom: []
+
+# --- pod defaults ------------------------------------------------------------
+podAnnotations: {}
+podLabels: {}
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+priorityClassName: ""
+
+probes:
+  liveness:
+    path: /healthz
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 6
+  readiness:
+    path: /readyz      # pings the metadata store
+    initialDelaySeconds: 2
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# Init container on storage/ingest/query/agent pods: wait until a gossip seed
+# accepts TCP before starting (ZeroWatch joins its seeds once, at startup).
+seedWait:
+  enabled: true
+  image: busybox:1.36.1
+  timeoutSeconds: 300
+  # After a failed lookup, keep waiting this long once the seed works, so
+  # NXDOMAIN answers CoreDNS cached before the record existed have expired
+  # (CoreDNS `cache 30` keeps them up to 30 s). No wait when nothing failed.
+  settleSeconds: 35
+
+# --- mode: single ---------------------------------------------------------------
+single:
+  # In-pod supervisor (it only sees the pod itself; the agent DaemonSet is the
+  # way to watch nodes). auto|true|false
+  supervisor: "false"
+  resources:
+    requests: { cpu: 200m, memory: 512Mi }
+    limits: { memory: 2Gi }
+  persistence:
+    enabled: true
+    storageClass: ""
+    size: 10Gi
+    accessModes: ["ReadWriteOnce"]
+    existingClaim: ""
+
+# --- mode: cluster --------------------------------------------------------------
+storageNodes:
+  replicas: 3
+  podManagementPolicy: OrderedReady
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { memory: 4Gi }
+  persistence:
+    enabled: true
+    storageClass: ""
+    size: 20Gi
+    accessModes: ["ReadWriteOnce"]
+  pdb:
+    enabled: true
+    maxUnavailable: 1
+
+ingest:
+  replicas: 2
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { memory: 1Gi }
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+
+query:
+  # Every query replica runs the alarm engine and the report scheduler, so
+  # replicas > 1 duplicates notifications (no leader election yet) and needs a
+  # shared metadata DSN.
+  replicas: 1
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { memory: 2Gi }
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+
+# --- services and ingress --------------------------------------------------------
+service:
+  # UI + API (+ CloudWatch query endpoints).
+  type: ClusterIP
+  annotations: {}
+ingestService:
+  # OTLP 4318, Prom remote write 8428, HTTP 8080 (/cloudwatch, native ingest).
+  type: ClusterIP
+  annotations: {}
+statsdService:
+  enabled: true
+  type: ClusterIP
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: zerowatch.example.com
+  # Ingest paths are routed to the ingest service (port http, which serves
+  # every ingest route too); everything else goes to the UI/API service.
+  ingestPaths:
+    - /v1/
+    - /api/v1/write
+    - /api/v1/ingest/
+    - /cloudwatch
+  tls: []
+  #  - secretName: zerowatch-tls
+  #    hosts: [zerowatch.example.com]
+
+# --- node agent DaemonSet (role=supervisor) ------------------------------------
+agent:
+  enabled: false
+  # Join the node's network namespace: the topology and the /proc probe then
+  # see the node's sockets, and the Host dimension is the node's hostname.
+  # Without it the Host dimension is the pod name (there is no --hostname flag).
+  hostNetwork: true
+  # Ports on the node when hostNetwork is on, so they must not clash.
+  httpPort: 18080
+  gossipPort: 17946
+  # eBPF needs CAP_BPF + CAP_PERFMON (load programs, attach tracepoints),
+  # CAP_SYS_RESOURCE (memlock on older kernels), CAP_SYS_PTRACE (read other
+  # processes' /proc/<pid>/fd for topology) and tracefs on the node at
+  # /sys/kernel/tracing (or debugfs). privileged=true is the fallback for
+  # kernels/runtimes where capabilities aren't enough (kernel < 5.8 has no
+  # CAP_BPF). Without them the agent falls back to the /proc probe.
+  privileged: false
+  # Gossip member name (ZW_NODE_NAME): pod = the pod name (default), node =
+  # spec.nodeName. A restarted agent that rejoins under its old name has been
+  # seen to stay rejected ("403 not a cluster member") by the other nodes, so
+  # pod is the safe default. The Host dimension is the hostname either way.
+  memberName: pod
+  capabilities:
+    - BPF
+    - PERFMON
+    - SYS_PTRACE
+    - SYS_RESOURCE
+    - DAC_READ_SEARCH
+  logDiscovery: true
+  logRoots: ["/var/log"]
+  hostMetrics: true
+  interval: 10s
+  mounts:
+    hostRoot: true        # / at /host (read-only) for disk usage (statfs)
+    tracefs: true         # /sys/kernel/tracing
+    debugfs: true         # /sys/kernel/debug
+    varLog: true          # /var/log (includes /var/log/pods, /var/log/containers)
+    dockerContainers: false  # /var/lib/docker/containers (docker json-file logs)
+  extraVolumes: []
+  extraVolumeMounts: []
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { memory: 512Mi }
+  tolerations:
+    - operator: Exists
+  nodeSelector: {}
+  affinity: {}
+  priorityClassName: ""
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+
+# --- optional model forecaster ----------------------------------------------------
+forecaster:
+  enabled: false
+  # The model is baked into the image at build time (forecaster/Dockerfile,
+  # build arg ZW_MODEL), so the tag names the model.
+  model: chronos-bolt-small   # chronos-bolt-{tiny,mini,small,base} | timesfm | seasonal-naive
+  image:
+    repository: zerowatch-forecaster
+    tag: ""                   # defaults to the model name
+    pullPolicy: IfNotPresent
+  # Use an already running forecaster instead (sets --forecaster-url only).
+  externalURL: ""
+  replicas: 1
+  port: 8090
+  resources:
+    requests: { cpu: 500m, memory: 1Gi }
+    limits: { memory: 3Gi }
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: ["ALL"]
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# --- optional extras ----------------------------------------------------------------
+networkPolicy:
+  enabled: false
+  # Who may reach the UI/API and ingest ports. Empty = anyone.
+  ingressFrom: []
+  # Node CIDRs: agents on hostNetwork reach gossip/internal RPC from node IPs.
+  nodeCIDRs: []
+
+serviceMonitor:
+  # ZeroWatch has no Prometheus /metrics exposition yet; this scrapes `path`
+  # once it exists (or a sidecar exporter).
+  enabled: false
+  path: /metrics
+  interval: 30s
+  labels: {}

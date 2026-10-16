@@ -1,0 +1,42 @@
+# Local-only working files (kept on disk, never pushed)
+HANDOFF.md
+graphify-out/
+
+# Agent / platform tool state
+.claude-flow/
+.swarm/
+.claude/
+.abacus.donotdelete
+.project_instructions.md
+
+# Build output (web/dist is committed on purpose: the Go binary embeds it)
+/zerowatch
+/zerowatch-*
+*.exe
+*.test
+*.out
+coverage.*
+
+# Node
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Local data, secrets, logs
+*.log
+*.db
+*.sqlite
+*.sqlite3
+.env
+.env.*
+!.env.example
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

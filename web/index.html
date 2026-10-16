@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="ZeroWatch: zero-touch observability. RED metrics, logs, alarms and the autonomous supervisor." />
+    <title>ZeroWatch</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23222'/%3E%3Cpath d='M2 11h2V6h2v7h2V3h2v8h2V8h2' fill='none' stroke='%23efe9dc' stroke-width='1.3'/%3E%3C/svg%3E" />
+    <link rel="preload" href="/fonts/space-grotesk-v22-PbF4Cw.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/jetbrains-mono-v24-PxDcwg.woff2" as="font" type="font/woff2" crossorigin />
+    <!-- Theme before first paint: no light flash for dark-theme visitors. Kept in step with src/lib/theme.ts. -->
+    <script>
+      (function () {
+        try {
+          var s = localStorage.getItem("zerowatch:theme");
+          var d = s === "dark" || (s !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.classList.toggle("dark", d);
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>ZeroWatch needs JavaScript for its live views. The API is at /api/v1/stats.</noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

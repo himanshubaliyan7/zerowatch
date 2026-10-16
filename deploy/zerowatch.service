@@ -1,0 +1,15 @@
+[Unit]
+Description=ZeroWatch observability (role=all)
+After=network-online.target
+Wants=network-online.target
+RequiresMountsFor=/home/ubuntu
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/zerowatch
+ExecStart=/home/ubuntu/zerowatch/bin/zerowatch --role=all --data-dir=/home/ubuntu/zerowatch/data
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

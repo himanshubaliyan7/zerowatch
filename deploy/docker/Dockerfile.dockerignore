@@ -1,0 +1,10 @@
+# Used automatically by BuildKit for deploy/docker/Dockerfile (context = repo root).
+*
+!go.mod
+!go.sum
+!cmd/
+!internal/
+!ebpf/
+!web/embed.go
+!web/dist/
+**/*_test.go
