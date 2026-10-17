@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
 )
 
 // StatsD / DogStatsD line protocol:

@@ -20,9 +20,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/commitlog"
-	"github.com/zerowatch/zerowatch/internal/emf"
-	"github.com/zerowatch/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/commitlog"
+	"github.com/himanshubaliyan7/zerowatch/internal/emf"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
 )
 
 // Pipeline validates and publishes telemetry.

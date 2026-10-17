@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/awssig"
+	"github.com/himanshubaliyan7/zerowatch/internal/awssig"
 )
 
 // TestMinIO runs the exactness and retention checks against a real MinIO:

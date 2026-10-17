@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/zerowatch/zerowatch/internal/awssig"
+	"github.com/himanshubaliyan7/zerowatch/internal/awssig"
 )
 
 // fakeS3 is an in-process path-style S3: PUT, GET (with Range), LIST v2

@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/codec"
-	"github.com/zerowatch/zerowatch/internal/model"
-	"github.com/zerowatch/zerowatch/internal/storage"
+	"github.com/himanshubaliyan7/zerowatch/internal/codec"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/storage"
 )
 
 // Object layout (one directory per tenant, kind and UTC hour):

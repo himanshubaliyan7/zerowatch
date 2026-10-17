@@ -10,7 +10,7 @@ import (
 
 	"github.com/zeebo/xxh3"
 
-	"github.com/zerowatch/zerowatch/internal/traces"
+	"github.com/himanshubaliyan7/zerowatch/internal/traces"
 )
 
 const (

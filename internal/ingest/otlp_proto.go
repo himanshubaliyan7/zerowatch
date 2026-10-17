@@ -19,7 +19,7 @@ import (
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/zerowatch/zerowatch/internal/httpx"
+	"github.com/himanshubaliyan7/zerowatch/internal/httpx"
 )
 
 // OTLP/HTTP protobuf. The *Data messages (MetricsData, LogsData,

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/zerowatch/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
 )
 
 // MetricStat selects a stored series and the statistic to compute per period.

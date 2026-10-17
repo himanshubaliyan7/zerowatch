@@ -16,8 +16,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/ingest"
-	"github.com/zerowatch/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/ingest"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
 )
 
 // Tier 3: autonomous log harvesting with schema inference. The supervisor

@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
 )
 
 // Event kinds.

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/ingest"
-	"github.com/zerowatch/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/ingest"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
 )
 
 func TestInferFormat(t *testing.T) {

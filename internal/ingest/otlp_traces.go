@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/zerowatch/zerowatch/internal/httpx"
-	"github.com/zerowatch/zerowatch/internal/traces"
+	"github.com/himanshubaliyan7/zerowatch/internal/httpx"
+	"github.com/himanshubaliyan7/zerowatch/internal/traces"
 )
 
 // OTLP/HTTP JSON traces (ExportTraceServiceRequest). Ids are hex strings in

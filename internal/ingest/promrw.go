@@ -7,7 +7,7 @@ import (
 	"github.com/golang/snappy"
 	"google.golang.org/protobuf/encoding/protowire"
 
-	"github.com/zerowatch/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
 )
 
 // Prometheus remote write v1 (prometheus/prompb):

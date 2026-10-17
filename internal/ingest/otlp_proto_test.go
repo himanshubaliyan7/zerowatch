@@ -20,9 +20,9 @@ import (
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/zerowatch/zerowatch/internal/commitlog"
-	"github.com/zerowatch/zerowatch/internal/model"
-	"github.com/zerowatch/zerowatch/internal/traces"
+	"github.com/himanshubaliyan7/zerowatch/internal/commitlog"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/traces"
 )
 
 func strAttr(k, v string) *commonpb.KeyValue {

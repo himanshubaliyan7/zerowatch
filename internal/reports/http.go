@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/alarms"
-	"github.com/zerowatch/zerowatch/internal/httpx"
+	"github.com/himanshubaliyan7/zerowatch/internal/alarms"
+	"github.com/himanshubaliyan7/zerowatch/internal/httpx"
 )
 
 // ParseTargets parses "slack:<url>", "webhook:<url>" and "log" entries.

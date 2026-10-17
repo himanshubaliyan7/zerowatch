@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/alarms"
-	"github.com/zerowatch/zerowatch/internal/query"
+	"github.com/himanshubaliyan7/zerowatch/internal/alarms"
+	"github.com/himanshubaliyan7/zerowatch/internal/query"
 )
 
 func open(t *testing.T) *SQLStore {

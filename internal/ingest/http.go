@@ -12,9 +12,9 @@ import (
 	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 
-	"github.com/zerowatch/zerowatch/internal/httpx"
-	"github.com/zerowatch/zerowatch/internal/model"
-	"github.com/zerowatch/zerowatch/internal/traces"
+	"github.com/himanshubaliyan7/zerowatch/internal/httpx"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/traces"
 )
 
 // Body limits per protocol.

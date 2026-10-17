@@ -9,9 +9,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/commitlog"
-	"github.com/zerowatch/zerowatch/internal/model"
-	"github.com/zerowatch/zerowatch/internal/storage"
+	"github.com/himanshubaliyan7/zerowatch/internal/commitlog"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/storage"
 )
 
 // DefaultConsumeRetryDelay is the pause before ConsumeRouter's second routing

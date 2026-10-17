@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/zerowatch/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
 )
 
 // OTLP/HTTP JSON encoding (opentelemetry-proto, JSON mapping). Only the

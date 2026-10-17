@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zerowatch/zerowatch/internal/query"
+	"github.com/himanshubaliyan7/zerowatch/internal/query"
 )
 
 // seasonal returns n points of level + slope·t + amp·sin(2πt/season).

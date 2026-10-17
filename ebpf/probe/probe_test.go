@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/procfs"
+	"github.com/himanshubaliyan7/zerowatch/internal/procfs"
 )
 
 func TestNormalizeRoute(t *testing.T) {

@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
 )
 
 // pyTLSServer is pyHandler behind ssl.SSLContext.wrap_socket. CPython's _ssl

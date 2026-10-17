@@ -4,7 +4,7 @@ import (
 	"net"
 	"sort"
 
-	"github.com/zerowatch/zerowatch/internal/procfs"
+	"github.com/himanshubaliyan7/zerowatch/internal/procfs"
 )
 
 // TopoNode is a service (a local process with listening ports) or an

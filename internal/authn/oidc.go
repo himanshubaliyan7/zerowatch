@@ -30,7 +30,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/httpx"
+	"github.com/himanshubaliyan7/zerowatch/internal/httpx"
 )
 
 // Config configures the OIDC client. Issuer empty means OIDC is off.

@@ -10,14 +10,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zerowatch/zerowatch/ebpf/probe"
-	"github.com/zerowatch/zerowatch/internal/hostmetrics"
-	"github.com/zerowatch/zerowatch/internal/ingest"
-	"github.com/zerowatch/zerowatch/internal/metadata"
-	"github.com/zerowatch/zerowatch/internal/model"
-	"github.com/zerowatch/zerowatch/internal/procfs"
-	"github.com/zerowatch/zerowatch/internal/query"
-	"github.com/zerowatch/zerowatch/internal/storage"
+	"github.com/himanshubaliyan7/zerowatch/ebpf/probe"
+	"github.com/himanshubaliyan7/zerowatch/internal/hostmetrics"
+	"github.com/himanshubaliyan7/zerowatch/internal/ingest"
+	"github.com/himanshubaliyan7/zerowatch/internal/metadata"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/procfs"
+	"github.com/himanshubaliyan7/zerowatch/internal/query"
+	"github.com/himanshubaliyan7/zerowatch/internal/storage"
 )
 
 type nopProbe struct{}

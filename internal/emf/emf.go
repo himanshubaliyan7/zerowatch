@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/zerowatch/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
 )
 
 // Limits from the EMF specification.

@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/zerowatch/zerowatch/internal/httpx"
+	"github.com/himanshubaliyan7/zerowatch/internal/httpx"
 )
 
 func TestRBACTable(t *testing.T) {

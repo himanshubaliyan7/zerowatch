@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/commitlog"
-	"github.com/zerowatch/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/commitlog"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
 )
 
 type capture struct{ recs []commitlog.Record }

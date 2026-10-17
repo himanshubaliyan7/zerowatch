@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/zerowatch/zerowatch/internal/procfs"
+	"github.com/himanshubaliyan7/zerowatch/internal/procfs"
 )
 
 func listen(ip string, port uint16, ino uint64) procfs.Socket {

@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/model"
-	"github.com/zerowatch/zerowatch/internal/procfs"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/procfs"
 )
 
 // Namespace holds every node metric. Dimensions: Host on all of them, plus

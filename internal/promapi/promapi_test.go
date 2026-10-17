@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/model"
-	"github.com/zerowatch/zerowatch/internal/storage"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/storage"
 )
 
 func TestParse(t *testing.T) {

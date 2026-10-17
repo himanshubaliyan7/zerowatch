@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/model"
-	"github.com/zerowatch/zerowatch/internal/procfs"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/procfs"
 )
 
 func write(t *testing.T, root, name, body string) {

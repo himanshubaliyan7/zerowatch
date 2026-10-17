@@ -4,7 +4,7 @@ import (
 	"math"
 	"sort"
 
-	"github.com/zerowatch/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
 )
 
 // REDNamespace matches the namespace the eBPF probe and the generator use,

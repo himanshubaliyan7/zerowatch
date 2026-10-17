@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/zerowatch/zerowatch/internal/traces"
+	"github.com/himanshubaliyan7/zerowatch/internal/traces"
 )
 
 func span(trace, id int, service string, start float64) traces.Span {

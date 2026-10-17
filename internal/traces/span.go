@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/zerowatch/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
 )
 
 // Span kinds (lowercase, as the UI expects).

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/zerowatch/zerowatch/internal/httpx"
+	"github.com/himanshubaliyan7/zerowatch/internal/httpx"
 )
 
 // Rule is one row of the authorization table. Method "*" matches any method.

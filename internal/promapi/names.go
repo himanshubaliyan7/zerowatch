@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/model"
-	"github.com/zerowatch/zerowatch/internal/storage"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/storage"
 )
 
 // Name mapping between ZeroWatch series and Prometheus label sets.

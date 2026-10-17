@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
 )
 
 // e2eHelperEnv makes the test binary act as the traced HTTP server

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/query"
+	"github.com/himanshubaliyan7/zerowatch/internal/query"
 )
 
 // Rule is a persisted alarm definition.

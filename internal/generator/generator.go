@@ -24,9 +24,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/ingest"
-	"github.com/zerowatch/zerowatch/internal/model"
-	"github.com/zerowatch/zerowatch/internal/traces"
+	"github.com/himanshubaliyan7/zerowatch/internal/ingest"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/traces"
 )
 
 // Namespace for synthetic RED metrics (same as the auto-instrumented RED namespace).

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/awssig"
+	"github.com/himanshubaliyan7/zerowatch/internal/awssig"
 )
 
 // SNSNotifier publishes transitions to an Amazon SNS topic (Target.URL is

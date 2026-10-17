@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/query"
+	"github.com/himanshubaliyan7/zerowatch/internal/query"
 )
 
 // Limits on one request.

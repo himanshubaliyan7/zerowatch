@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/zerowatch/zerowatch/internal/alarms"
-	"github.com/zerowatch/zerowatch/internal/hostmetrics"
-	"github.com/zerowatch/zerowatch/internal/metadata"
-	"github.com/zerowatch/zerowatch/internal/query"
-	"github.com/zerowatch/zerowatch/internal/storage"
+	"github.com/himanshubaliyan7/zerowatch/internal/alarms"
+	"github.com/himanshubaliyan7/zerowatch/internal/hostmetrics"
+	"github.com/himanshubaliyan7/zerowatch/internal/metadata"
+	"github.com/himanshubaliyan7/zerowatch/internal/query"
+	"github.com/himanshubaliyan7/zerowatch/internal/storage"
 )
 
 // Capacity alarm settings: predictive rules on this node's resources.

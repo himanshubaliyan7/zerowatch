@@ -4,10 +4,10 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/zerowatch/zerowatch/internal/commitlog"
-	"github.com/zerowatch/zerowatch/internal/httpx"
-	"github.com/zerowatch/zerowatch/internal/storage"
-	"github.com/zerowatch/zerowatch/internal/traces"
+	"github.com/himanshubaliyan7/zerowatch/internal/commitlog"
+	"github.com/himanshubaliyan7/zerowatch/internal/httpx"
+	"github.com/himanshubaliyan7/zerowatch/internal/storage"
+	"github.com/himanshubaliyan7/zerowatch/internal/traces"
 )
 
 // Options configure a node (from config.Config plus ZW_CLUSTER_SECRET).

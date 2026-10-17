@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/commitlog"
-	"github.com/zerowatch/zerowatch/internal/ingest"
-	"github.com/zerowatch/zerowatch/internal/traces"
+	"github.com/himanshubaliyan7/zerowatch/internal/commitlog"
+	"github.com/himanshubaliyan7/zerowatch/internal/ingest"
+	"github.com/himanshubaliyan7/zerowatch/internal/traces"
 )
 
 func TestTickProducesValidRED(t *testing.T) {

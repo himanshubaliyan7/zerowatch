@@ -14,10 +14,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/model"
-	"github.com/zerowatch/zerowatch/internal/query"
-	"github.com/zerowatch/zerowatch/internal/storage"
-	"github.com/zerowatch/zerowatch/internal/traces"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/query"
+	"github.com/himanshubaliyan7/zerowatch/internal/storage"
+	"github.com/himanshubaliyan7/zerowatch/internal/traces"
 )
 
 var quiet = slog.New(slog.NewTextHandler(io.Discard, nil))

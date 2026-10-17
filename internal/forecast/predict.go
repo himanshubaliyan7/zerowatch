@@ -13,7 +13,7 @@ import (
 	"math"
 	"sort"
 
-	"github.com/zerowatch/zerowatch/internal/anomaly"
+	"github.com/himanshubaliyan7/zerowatch/internal/anomaly"
 )
 
 // Method names.

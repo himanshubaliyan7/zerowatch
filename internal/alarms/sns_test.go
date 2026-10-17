@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/httpx"
+	"github.com/himanshubaliyan7/zerowatch/internal/httpx"
 )
 
 // The signer is checked against ZeroWatch's own SigV4 verifier (which follows

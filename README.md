@@ -109,6 +109,13 @@ cd zerowatch
 go run ./cmd/zerowatch --role=all        # UI + API on http://localhost:8080
 ```
 
+Or install the binary straight from the module path:
+
+```bash
+go install github.com/himanshubaliyan7/zerowatch/cmd/zerowatch@latest
+zerowatch --role=all
+```
+
 `--role=all` turns on a synthetic traffic generator (6 services × 3 routes, with incidents), so the UI has data straight away. Turn it off with `--generate=false`.
 
 ### With Docker only (no Go toolchain)

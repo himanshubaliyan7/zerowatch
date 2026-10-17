@@ -3,7 +3,7 @@ package live
 import (
 	"testing"
 
-	"github.com/zerowatch/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
 )
 
 func TestHubFilterTenantAndDrop(t *testing.T) {

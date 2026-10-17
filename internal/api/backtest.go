@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/alarms"
-	"github.com/zerowatch/zerowatch/internal/forecast"
-	"github.com/zerowatch/zerowatch/internal/httpx"
-	"github.com/zerowatch/zerowatch/internal/query"
+	"github.com/himanshubaliyan7/zerowatch/internal/alarms"
+	"github.com/himanshubaliyan7/zerowatch/internal/forecast"
+	"github.com/himanshubaliyan7/zerowatch/internal/httpx"
+	"github.com/himanshubaliyan7/zerowatch/internal/query"
 )
 
 // Backtest limits: at most maxBacktestEvals forecasts per request, each from

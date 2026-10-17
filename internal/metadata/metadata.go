@@ -21,7 +21,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib" // postgres driver "pgx"
 	_ "modernc.org/sqlite"             // pure-Go sqlite driver "sqlite"
 
-	"github.com/zerowatch/zerowatch/internal/alarms"
+	"github.com/himanshubaliyan7/zerowatch/internal/alarms"
 )
 
 // Errors.

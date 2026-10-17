@@ -24,10 +24,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/httpx"
-	"github.com/zerowatch/zerowatch/internal/model"
-	"github.com/zerowatch/zerowatch/internal/query"
-	"github.com/zerowatch/zerowatch/internal/storage"
+	"github.com/himanshubaliyan7/zerowatch/internal/httpx"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/query"
+	"github.com/himanshubaliyan7/zerowatch/internal/storage"
 )
 
 // Store is the part of storage.Engine the API needs.

@@ -1,4 +1,4 @@
-module github.com/zerowatch/zerowatch
+module github.com/himanshubaliyan7/zerowatch
 
 go 1.23.4
 

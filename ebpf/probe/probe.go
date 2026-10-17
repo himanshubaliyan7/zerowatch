@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zerowatch/zerowatch/internal/model"
+	"github.com/himanshubaliyan7/zerowatch/internal/model"
 )
 
 // Namespaces emitted by probes.
