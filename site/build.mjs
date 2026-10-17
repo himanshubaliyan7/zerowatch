@@ -18,7 +18,9 @@ writeFileSync(join(here, "index.html"), head + page + "\n</html>\n");
 
 const previewDir = process.argv[2];
 if (previewDir) {
-  const inlined = page.replace(/url\("fonts\/([^"]+)"\)/g, (_, f) =>
+  // The preview runs in a sandbox that blocks requests to other sites, so it keeps
+  // the form in its "not connected" state instead of showing a failed send.
+  const inlined = page.replace(/data-endpoint="[^"]*"/, 'data-endpoint=""').replace(/url\("fonts\/([^"]+)"\)/g, (_, f) =>
     `url("data:font/woff2;base64,${readFileSync(join(here, "fonts", f)).toString("base64")}")`);
   mkdirSync(previewDir, { recursive: true });
   writeFileSync(join(previewDir, "zerowatch-landing.html"), inlined);

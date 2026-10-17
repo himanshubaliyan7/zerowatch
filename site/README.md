@@ -18,7 +18,15 @@ The form posts JSON to the URL in its `data-endpoint` attribute (`<form id="wl" 
 { "email": "...", "size": "20–99", "bill": "$5k–20k", "stack": ["datadog", "cloudwatch"] }
 ```
 
-While the attribute is empty, the form validates input but sends nothing, and says so. Any endpoint that accepts a JSON POST and answers 2xx will work: Formspree, a Cloudflare Worker, or a small handler on our own server.
+It is wired to Formspree: the form "ZeroWatch waitlist" (`https://formspree.io/f/xljgzvng`) in the owner's Formspree account.
+- Submissions appear under Submissions in the Formspree dashboard and are also emailed to the account address.
+- The free plan allows 50 submissions a month.
+- The form ID is public by design, since it ships in the page.
+- Once the site has a domain, set Settings → Restrict to domain in Formspree, so other sites can't post to the form.
+
+The single-file preview made by `build.mjs` clears the endpoint, so it shows "nothing was sent" instead of a failed request.
+
+To switch providers, change the attribute. Any endpoint that accepts a JSON POST and answers 2xx will work.
 
 ## What we took from competitors' pages (2026-10-17)
 
