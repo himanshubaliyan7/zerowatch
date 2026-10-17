@@ -48,9 +48,10 @@ WARNING: metadata is SQLite per pod. Auto-dashboards and alarms made by the agen
          query replicas) are not visible in the UI. Set metadata.dsn or secret key {{ .Values.secrets.keys.metadataDSN }} to a shared postgres:// DSN.
 {{- end }}
 {{- end }}
-{{- if and (eq .Values.mode "cluster") (or (gt (int .Values.query.replicas) 1) .Values.query.autoscaling.enabled) }}
+{{- if and (not .Values.metadata.dsn) (not .Values.secrets.existingSecret) (eq .Values.mode "cluster") (or (gt (int .Values.query.replicas) 1) .Values.query.autoscaling.enabled) }}
 
-WARNING: every query replica runs the alarm engine and report scheduler; notifications are sent once per replica.
+WARNING: alarms and scheduled reports run on the one query replica holding a lease in the metadata DB.
+         With SQLite per pod every replica wins its own lease, so notifications are sent once per replica.
 {{- end }}
 {{- if and (eq .Values.storage.backend "clickhouse") (eq .Values.mode "cluster") (gt (int .Values.storageNodes.replicas) 1) }}
 

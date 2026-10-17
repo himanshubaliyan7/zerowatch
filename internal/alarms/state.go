@@ -20,6 +20,10 @@ const (
 	StateInsufficientData State = "INSUFFICIENT_DATA"
 )
 
+func (s State) valid() bool {
+	return s == StateOK || s == StateAlarm || s == StateInsufficientData
+}
+
 // Comparison operators (CloudWatch names).
 const (
 	GreaterThanThreshold          = "GreaterThanThreshold"

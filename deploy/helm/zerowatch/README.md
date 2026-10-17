@@ -136,7 +136,7 @@ ZeroWatch resolves and joins its `--cluster-seeds` once, at start-up, and doesn'
 ## Caveats
 
 - **Metadata is per pod unless you share it.** With the default SQLite, dashboards and alarms that the agents synthesize land in each agent's own store and never reach the UI. Edits on one query replica aren't seen by another either. Use a shared `postgres://` DSN for the agent and for `query.replicas > 1`.
-- **Alarms and reports run on every query replica**, with no leader election, so more than one replica sends duplicate notifications.
+- **Alarms and reports run on one query replica**, elected through a lease in the metadata DB. That only works with a shared `postgres://` DSN: with per-pod SQLite every replica leads and sends its own notifications.
 - **ClickHouse with several storage replicas:** all of them point at one database, and fan-out reads repeat rows. Use one storage replica or `mode: single`.
 - `oidc` and `tiering` values are placeholders (coming in wave 4). Wire them with `extraArgs` / `extraEnv` until the flags exist.
 - Out of scope, listed as next: a mutating admission webhook for runtime injection (JVM, Node, Python agents).

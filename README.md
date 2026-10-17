@@ -360,6 +360,7 @@ flowchart LR
   The TimesFM and Chronos rows are from session 3 and the built-in rows from session 4; [`results.md`](forecaster/bench/results.md) has the full tables.
 
 - Reports: `GET /api/v1/reports/summary[.html]?range=24h|7d|30d` and `POST /api/v1/reports/send`. To schedule them: `--report-targets slack:<url>,webhook:<url>,log --report-every 24h`.
+- **One sender per cluster:** the alarm engine and the report scheduler run only on the query replica that holds the `singletons` lease in the metadata DB. It renews the lease every TTL/3 (`--leader-lease-ttl`, default 15 s). On a clean shutdown it releases the lease and a standby takes over within one renew interval; after a crash, within one TTL. A new leader resumes each alarm from its persisted state, so failover doesn't re-send notifications. All replicas must share a Postgres `--metadata-dsn`, and their clocks should be NTP-synced.
 
 ## Deployment modes
 
@@ -489,6 +490,7 @@ Every flag also has an environment variable (`--flag-name` → `ZW_FLAG_NAME`). 
 | `--generate` | `auto` (on for `role=all`) | synthetic traffic |
 | `--forecaster-url` | | model sidecar |
 | `--report-targets`, `--report-every`, `--report-range` | | scheduled reports |
+| `--leader-lease-ttl` | `15s` | lease that picks the one replica running alarms and reports |
 | `--prometheus-api` | `true` | the `/prometheus` API |
 
 Run `zerowatch --help` for the full list.
@@ -540,14 +542,13 @@ ZeroWatch is a working prototype: every feature above is implemented and covered
 
 Known limits:
 - **eBPF:** covers HTTP/1.x, plaintext or OpenSSL TLS, on x86-64. HTTP/2/gRPC, Go `crypto/tls`, BoringSSL and rustls are not covered. Topology and eBPF need root (or `CAP_BPF`/`CAP_SYS_PTRACE`).
-- **Alarms in a cluster:** every query replica evaluates alarms and sends notifications (no leader election yet).
+- **Alarms in a cluster:** one query replica sends notifications, elected through the metadata DB. With per-replica SQLite every replica leads, so HA needs a shared Postgres.
 - **OIDC:** tested live only with Keycloak. Sign-out is local only (no end-session redirect).
 - **Tiering:** tested against MinIO, not AWS S3. Up to 1 h of queued data is lost on a crash.
 - **ClickHouse:** has its own TTLs and doesn't use the cold tier.
 
 ## Roadmap
 
-- [ ] Leader election for alarms and scheduled reports
 - [ ] A Prometheus `/metrics` endpoint for self-monitoring; `--gossip-advertise-addr`
 - [ ] eBPF: HTTP/2 and gRPC (HPACK), `readv`/`sendmsg`/io_uring, Go `crypto/tls` uprobes
 - [ ] Kubernetes mutating webhook for runtime injection (JVM, Node, Python)

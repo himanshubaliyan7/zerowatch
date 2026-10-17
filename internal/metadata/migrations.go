@@ -67,6 +67,12 @@ var migrations = []string{
 		log_group TEXT NOT NULL DEFAULT '',
 		created_at BIGINT NOT NULL
 	);`,
+	// 2: leader-election leases (one row per singleton job, e.g. "alarms")
+	`CREATE TABLE IF NOT EXISTS leases (
+		name TEXT PRIMARY KEY,
+		holder TEXT NOT NULL,
+		expires_at BIGINT NOT NULL
+	);`,
 }
 
 func (s *SQLStore) migrate(ctx context.Context) error {

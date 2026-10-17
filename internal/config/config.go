@@ -112,6 +112,7 @@ type Config struct {
 	ReportTargets []string      // "slack:<url>", "webhook:<url>" or "log"
 	ReportEvery   time.Duration // scheduled report interval; 0 disables
 	ReportRange   string        // range of scheduled reports: 24h|7d|30d
+	LeaderLease   time.Duration // TTL of the metadata-DB lease that picks the one replica running alarms and reports
 
 	ShutdownTimeout time.Duration
 }
@@ -308,6 +309,7 @@ func Load(args []string) (*Config, error) {
 	reportTargets := fs.String("report-targets", env("ZW_REPORT_TARGETS", ""), "comma-separated report destinations: slack:<url>, webhook:<url>, log")
 	fs.DurationVar(&c.ReportEvery, "report-every", envDur("ZW_REPORT_EVERY", 0), "send the summary report on this interval (e.g. 24h); 0 disables")
 	fs.StringVar(&c.ReportRange, "report-range", env("ZW_REPORT_RANGE", "24h"), "range covered by scheduled reports: 24h|7d|30d")
+	fs.DurationVar(&c.LeaderLease, "leader-lease-ttl", envDur("ZW_LEADER_LEASE_TTL", 15*time.Second), "lease TTL for electing the replica that runs alarms and scheduled reports (renewed every TTL/3)")
 	fs.DurationVar(&c.ShutdownTimeout, "shutdown-timeout", envDur("ZW_SHUTDOWN_TIMEOUT", 15*time.Second), "graceful shutdown timeout")
 	if err := fs.Parse(args); err != nil {
 		return nil, err
@@ -387,6 +389,9 @@ func (c *Config) Validate() error {
 	}
 	if c.ReportEvery < 0 || c.ReportEvery > 0 && c.ReportEvery < time.Minute {
 		return errors.New("config: report-every must be 0 or at least 1m")
+	}
+	if c.LeaderLease < 3*time.Second || c.LeaderLease > 5*time.Minute {
+		return errors.New("config: leader-lease-ttl must be in [3s,5m]")
 	}
 	if c.ForecasterURL != "" && !strings.HasPrefix(c.ForecasterURL, "http://") && !strings.HasPrefix(c.ForecasterURL, "https://") {
 		return errors.New("config: forecaster-url must be an http(s) URL")

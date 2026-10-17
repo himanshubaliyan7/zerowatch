@@ -14,6 +14,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -29,6 +30,7 @@ import (
 	"github.com/himanshubaliyan7/zerowatch/internal/generator"
 	"github.com/himanshubaliyan7/zerowatch/internal/httpx"
 	"github.com/himanshubaliyan7/zerowatch/internal/ingest"
+	"github.com/himanshubaliyan7/zerowatch/internal/leader"
 	"github.com/himanshubaliyan7/zerowatch/internal/live"
 	"github.com/himanshubaliyan7/zerowatch/internal/metadata"
 	"github.com/himanshubaliyan7/zerowatch/internal/model"
@@ -222,9 +224,6 @@ func run() error {
 		IngestLag: 30 * time.Second, OnTransition: func(tr alarms.Transition) {
 			hub.Publish(live.Event{Kind: live.KindAlarm, TenantID: 1, Time: time.Now().UnixMilli(), Data: tr})
 		}}
-	if cfg.Runs(config.RoleQuery) {
-		go alarmEngine.Run(ctx, 10*time.Second)
-	}
 
 	if cfg.Generate {
 		g := generator.New(generator.Config{Services: cfg.GenerateServices, Tenant: 1, Traces: tstore}, pipe, log)
@@ -246,16 +245,43 @@ func run() error {
 	}
 	rb := &reports.Builder{Series: store, Query: qe, Alarms: meta, States: alarmEngine.States, Traces: tstore, Forecast: fc,
 		Targets: reportTargets, Log: log}
-	if cfg.ReportEvery > 0 && cfg.Runs(config.RoleQuery) {
-		if len(reportTargets) == 0 {
-			log.Warn("report-every is set but no report-targets; scheduled reports disabled")
-		} else {
-			go rb.Run(ctx, cfg.ReportEvery, 1, cfg.ReportRange)
+	scheduledReports := cfg.ReportEvery > 0 && len(reportTargets) > 0
+	if cfg.ReportEvery > 0 && len(reportTargets) == 0 {
+		log.Warn("report-every is set but no report-targets; scheduled reports disabled")
+	}
+	// Alarms and scheduled reports run on exactly one query replica: the
+	// holder of the "singletons" lease in the metadata DB. Replicas with their
+	// own SQLite each win their own lease, so HA needs a shared Postgres.
+	var elector *leader.Elector
+	electorDone := make(chan struct{})
+	if cfg.Runs(config.RoleQuery) {
+		if node.Engine != nil && strings.HasPrefix(cfg.MetadataDSN, "sqlite:") {
+			log.Warn("cluster mode with SQLite metadata: every query replica will send alarm notifications; set --metadata-dsn to a shared Postgres")
 		}
+		elector = &leader.Elector{Leases: meta, Name: "singletons", Holder: leader.NewHolder(cfg.NodeName), TTL: cfg.LeaderLease, Log: log}
+		go func() {
+			defer close(electorDone)
+			elector.Run(ctx, func(lctx context.Context) {
+				var wg sync.WaitGroup
+				wg.Add(1)
+				go func() { defer wg.Done(); alarmEngine.Run(lctx, 10*time.Second) }()
+				if scheduledReports {
+					wg.Add(1)
+					go func() { defer wg.Done(); rb.Run(lctx, cfg.ReportEvery, 1, cfg.ReportRange) }()
+				}
+				wg.Wait()
+				alarmEngine.Reset()
+			})
+		}()
+	} else {
+		close(electorDone)
 	}
 	srv := &api.Server{Storage: store, Meta: meta, Query: qe, Pipeline: pipe, Hub: hub, Alarms: alarmEngine, Static: static, Log: log, Traces: tstore, Forecast: fc,
 		Extra: func() map[string]any {
 			out := map[string]any{"role": cfg.Role, "node": cfg.NodeName, "ebpfBuild": probe.Available}
+			if elector != nil {
+				out["leader"] = elector.Leading()
+			}
 			if memLog != nil {
 				out["commitLog"] = memLog.Stats()
 			}
@@ -367,6 +393,12 @@ func run() error {
 	defer cancel()
 	for _, s := range servers {
 		_ = s.Shutdown(sctx)
+	}
+	// Let the elector release its lease (a standby takes over at once) before
+	// the deferred meta.Close runs.
+	select {
+	case <-electorDone:
+	case <-sctx.Done():
 	}
 	log.Info("shutdown complete")
 	return nil

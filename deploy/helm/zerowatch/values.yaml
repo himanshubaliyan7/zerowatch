@@ -213,9 +213,10 @@ ingest:
     targetCPUUtilizationPercentage: 70
 
 query:
-  # Every query replica runs the alarm engine and the report scheduler, so
-  # replicas > 1 duplicates notifications (no leader election yet) and needs a
-  # shared metadata DSN.
+  # The alarm engine and report scheduler run on one replica at a time, the
+  # holder of a lease in the metadata DB (failover within --leader-lease-ttl,
+  # 15s). replicas > 1 needs a shared metadata DSN; with per-pod SQLite every
+  # replica leads and notifications are duplicated.
   replicas: 1
   resources:
     requests: { cpu: 100m, memory: 256Mi }

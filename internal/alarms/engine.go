@@ -153,6 +153,15 @@ func (e *Engine) States() map[string]State {
 	return out
 }
 
+// Reset drops all in-memory state machines. Call it when this replica stops
+// evaluating (leadership lost), so States no longer reports stale values and
+// a later term resumes from the persisted states.
+func (e *Engine) Reset() {
+	e.mu.Lock()
+	e.machines = nil
+	e.mu.Unlock()
+}
+
 // Tick performs one evaluation pass (exported for tests).
 func (e *Engine) Tick(ctx context.Context) error {
 	now := time.Now
@@ -184,6 +193,11 @@ func (e *Engine) Tick(ctx context.Context) error {
 				e.Log.Warn("invalid alarm rule", "rule", r.ID, "err", err)
 				continue
 			}
+			// Resume from the persisted state, so a restart or a leader
+			// failover doesn't re-notify a rule that is already in ALARM.
+			if r.State.valid() {
+				m.State = r.State
+			}
 			en = &entry{m: m, version: r.UpdatedAt}
 			e.machines[r.ID] = en
 		}
@@ -203,7 +217,8 @@ func (e *Engine) Tick(ctx context.Context) error {
 			continue
 		}
 		start := end - pMs
-		if en.lastEval == 0 && r.Config.EvaluationPeriods > 1 {
+		warm := en.lastEval == 0
+		if warm && r.Config.EvaluationPeriods > 1 {
 			// Warm the window on first sight so restarts don't reset state to
 			// INSUFFICIENT_DATA for N periods.
 			start = end - pMs*int64(r.Config.EvaluationPeriods)
@@ -213,14 +228,26 @@ func (e *Engine) Tick(ctx context.Context) error {
 			e.Log.Warn("alarm fetch failed", "rule", r.Name, "err", err)
 			continue
 		}
+		// While warming, the half-filled window can flap, so only the net
+		// change against the seeded state is emitted.
+		seeded := en.m.State
+		var last *Transition
 		for i, v := range vals {
 			from := en.m.State
 			st, changed, reason := en.m.Step(v)
 			if changed {
 				tr := Transition{RuleID: r.ID, RuleName: r.Name, TenantID: r.TenantID, From: from, To: st, Reason: reason, Value: v,
 					Timestamp: time.UnixMilli(start + int64(i+1)*pMs)}
+				if warm {
+					last = &tr
+					continue
+				}
 				e.emit(ctx, r, tr)
 			}
+		}
+		if last != nil && en.m.State != seeded {
+			last.From = seeded
+			e.emit(ctx, r, *last)
 		}
 		en.lastEval = end
 	}

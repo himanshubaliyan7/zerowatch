@@ -251,9 +251,10 @@ func TestEngineTick(t *testing.T) {
 	}
 	// re-tick within same period: no duplicate evaluation
 	_ = e.Tick(context.Background())
-	// first tick: INSUFFICIENT_DATA->OK (warm-up) then OK->ALARM
-	if len(s.trs) != 2 {
-		t.Fatalf("expected exactly 2 transitions, got %d", len(s.trs))
+	// first tick warms the window silently: one net INSUFFICIENT_DATA->ALARM,
+	// not the half-window INSUFFICIENT_DATA->OK->ALARM flap
+	if len(s.trs) != 1 || s.trs[0].From != StateInsufficientData || s.trs[0].To != StateAlarm {
+		t.Fatalf("expected one INSUFFICIENT_DATA->ALARM transition, got %+v", s.trs)
 	}
 	// next period has a healthy point -> still ALARM is false since 3-of-3 required
 	ff.pts = append(ff.pts, model.Point{T: 600_000, V: 10})
@@ -261,6 +262,40 @@ func TestEngineTick(t *testing.T) {
 	_ = e.Tick(context.Background())
 	if e.States()["r1"] != StateOK {
 		t.Fatalf("expected OK, got %v", e.States())
+	}
+}
+
+// A new leader (or a restarted replica) resumes from the persisted state:
+// a rule already in ALARM whose data still breaches must not notify again.
+func TestEngineResumesPersistedState(t *testing.T) {
+	now := time.UnixMilli(600_000 + 5_000)
+	ff := &fetch{pts: []model.Point{{T: 420_000, V: 95}, {T: 480_000, V: 97}, {T: 540_000, V: 99}}}
+	r := Rule{ID: "r1", Name: "cpu", Enabled: true, PeriodSec: 60, Metric: &query.MetricStat{Namespace: "n", MetricName: "cpu"},
+		Config: cfg(3, 3, MissingMissing), State: StateAlarm, UpdatedAt: time.Unix(1, 0)}
+	if err := r.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	s := &sink{}
+	e := &Engine{Rules: rules{r}, Sink: s, Query: &query.Engine{Fetcher: ff}, Log: slog.New(slog.NewTextHandler(io.Discard, nil)), Now: func() time.Time { return now }}
+	if err := e.Tick(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if e.States()["r1"] != StateAlarm || len(s.trs) != 0 {
+		t.Fatalf("state %v, transitions %+v; want ALARM and none", e.States()["r1"], s.trs)
+	}
+
+	// Leadership lost: no stale states. The next term resumes from the
+	// persisted state and emits only the net change.
+	e.Reset()
+	if len(e.States()) != 0 {
+		t.Fatalf("Reset left states %v", e.States())
+	}
+	ff.pts = []model.Point{{T: 420_000, V: 10}, {T: 480_000, V: 12}, {T: 540_000, V: 11}}
+	if err := e.Tick(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(s.trs) != 1 || s.trs[0].From != StateAlarm || s.trs[0].To != StateOK {
+		t.Fatalf("want one ALARM->OK transition, got %+v", s.trs)
 	}
 }
 
