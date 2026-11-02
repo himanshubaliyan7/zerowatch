@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -116,6 +118,56 @@ func TestGuardThrottlesConcurrentAuthFailures(t *testing.T) {
 	}
 	if refused != 2 {
 		t.Fatalf("%d of %d concurrent bad credentials reached auth; the burst is 2", refused, n)
+	}
+}
+
+func TestClientIPTrustsOnlyConfiguredProxies(t *testing.T) {
+	proxies := []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8"), netip.MustParsePrefix("::1/128")}
+	cases := []struct {
+		name, remote string
+		xff          []string
+		trusted      []netip.Prefix
+		want         string
+	}{
+		{"no proxies configured ignores the header", "203.0.113.9:5000", []string{"1.2.3.4"}, nil, "203.0.113.9"},
+		{"untrusted peer ignores the header", "203.0.113.9:5000", []string{"1.2.3.4"}, proxies, "203.0.113.9"},
+		{"trusted peer gives the hop it saw", "10.0.0.2:5000", []string{"198.51.100.7"}, proxies, "198.51.100.7"},
+		{"spoofed left entries are skipped", "10.0.0.2:5000", []string{"6.6.6.6, 198.51.100.7"}, proxies, "198.51.100.7"},
+		{"chained trusted proxies are walked past", "10.0.0.2:5000", []string{"6.6.6.6, 198.51.100.7, 10.1.1.1"}, proxies, "198.51.100.7"},
+		{"repeated headers count as one list", "10.0.0.2:5000", []string{"6.6.6.6", "198.51.100.7"}, proxies, "198.51.100.7"},
+		{"garbage stops at the last vouched hop", "10.0.0.2:5000", []string{"198.51.100.7, not-an-ip"}, proxies, "10.0.0.2"},
+		{"all hops trusted gives the leftmost", "10.0.0.2:5000", []string{"10.9.9.9, 10.1.1.1"}, proxies, "10.9.9.9"},
+		{"ports and brackets are stripped", "[::1]:5000", []string{"[2001:db8::5]:443"}, proxies, "2001:db8::5"},
+		{"no header from a trusted peer is the peer", "10.0.0.2:5000", nil, proxies, "10.0.0.2"},
+	}
+	for _, c := range cases {
+		r := httptest.NewRequest("GET", "/", nil)
+		r.RemoteAddr = c.remote
+		for _, v := range c.xff {
+			r.Header.Add("X-Forwarded-For", v)
+		}
+		if got := ClientIP(r, c.trusted); got != c.want {
+			t.Errorf("%s: got %q want %q", c.name, got, c.want)
+		}
+	}
+}
+
+// A client that rotates X-Forwarded-For must still land in one failure bucket.
+func TestGuardIgnoresSpoofedForwardedFor(t *testing.T) {
+	rl := NewRateLimiter(0.001, 2)
+	h := rl.Guard(Auth(NewKeyStore(map[string]uint32{"secret-key-aaaaaaaaaaaa": 1}), nil), nil)(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(204) }))
+	var codes []int
+	for i := 0; i < 3; i++ {
+		req := httptest.NewRequest("GET", "/api/x", nil)
+		req.Header.Set("Authorization", "Bearer bad")
+		req.Header.Set("X-Forwarded-For", "198.51.100."+strconv.Itoa(i))
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		codes = append(codes, rec.Code)
+	}
+	if codes[0] != 401 || codes[1] != 401 || codes[2] != 429 {
+		t.Fatalf("codes %v, want 401 401 429", codes)
 	}
 }
 

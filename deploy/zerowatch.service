@@ -7,7 +7,7 @@ RequiresMountsFor=/home/ubuntu
 [Service]
 User=ubuntu
 WorkingDirectory=/home/ubuntu/zerowatch
-ExecStart=/home/ubuntu/zerowatch/bin/zerowatch --role=all --data-dir=/home/ubuntu/zerowatch/data
+ExecStart=/home/ubuntu/zerowatch/bin/zerowatch --role=all --data-dir=/home/ubuntu/zerowatch/data --trusted-proxies=127.0.0.1
 Restart=on-failure
 RestartSec=3
 

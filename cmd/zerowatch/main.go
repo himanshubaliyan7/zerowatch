@@ -347,6 +347,10 @@ func run() error {
 		httpx.LogAuthMode(log, ks)
 	}
 	rl := httpx.NewRateLimiter(cfg.RateLimitRPS, cfg.RateLimitBurst)
+	rl.TrustProxies(cfg.TrustedProxies)
+	if len(cfg.TrustedProxies) > 0 {
+		log.Info("X-Forwarded-For trusted from proxies", "proxies", len(cfg.TrustedProxies))
+	}
 	handler := httpx.Chain(mux, httpx.Observe(log), httpx.SecurityHeaders, httpx.CORS(cfg.CORSOrigins),
 		rl.Guard(httpx.AuthWithSessions(ks, sess, func(r *http.Request) bool { return api.IsPublic(r) || authn.IsPublic(r) }),
 			func(r *http.Request) bool {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -65,6 +66,7 @@ type Config struct {
 	RateLimitRPS   float64
 	RateLimitBurst int
 	CORSOrigins    []string
+	TrustedProxies []netip.Prefix // proxies whose X-Forwarded-For is believed for per-IP limits
 
 	// OIDC browser sign-in. The secret and session key come from the
 	// environment only (flags show up in ps).
@@ -190,6 +192,25 @@ func ParseAPIKeys(s string) ([]APIKey, error) {
 	return out, nil
 }
 
+// ParseTrustedProxies parses "10.0.0.0/8,127.0.0.1,..."; a bare IP trusts
+// just that address.
+func ParseTrustedProxies(s string) ([]netip.Prefix, error) {
+	var out []netip.Prefix
+	for _, p := range splitList(s) {
+		if pfx, err := netip.ParsePrefix(p); err == nil {
+			out = append(out, pfx.Masked())
+			continue
+		}
+		a, err := netip.ParseAddr(p)
+		if err != nil {
+			return nil, fmt.Errorf("trusted-proxies entry %q: want an IP or CIDR", p)
+		}
+		a = a.Unmap()
+		out = append(out, netip.PrefixFrom(a, a.BitLen()))
+	}
+	return out, nil
+}
+
 func validRole(r string) bool { return r == "viewer" || r == "editor" || r == "admin" }
 
 // ParseRoleMap parses "claimValue=role,...".
@@ -266,6 +287,7 @@ func Load(args []string) (*Config, error) {
 	rps := fs.Float64("rate-limit-rps", float64(envInt("ZW_RATE_LIMIT_RPS", 200)), "per-client requests/second")
 	fs.IntVar(&c.RateLimitBurst, "rate-limit-burst", envInt("ZW_RATE_LIMIT_BURST", 400), "per-client burst")
 	cors := fs.String("cors-origins", env("ZW_CORS_ORIGINS", ""), "comma-separated allowed CORS origins")
+	proxies := fs.String("trusted-proxies", env("ZW_TRUSTED_PROXIES", ""), "comma-separated IPs or CIDRs of reverse proxies whose X-Forwarded-For is believed; empty = header ignored")
 	gen := fs.String("generate", env("ZW_GENERATE", "auto"), "synthetic RED/log generator: auto|true|false (auto = on for role=all)")
 	fs.IntVar(&c.GenerateServices, "generate-services", envInt("ZW_GENERATE_SERVICES", 6), "number of synthetic services")
 	sup := fs.String("supervisor", env("ZW_SUPERVISOR", "auto"), "RedBrain supervisor loop: auto|true|false")
@@ -322,6 +344,9 @@ func Load(args []string) (*Config, error) {
 	c.RateLimitRPS = *rps
 	var err error
 	if c.OIDCRoleMap, err = ParseRoleMap(*roleMap); err != nil {
+		return nil, err
+	}
+	if c.TrustedProxies, err = ParseTrustedProxies(*proxies); err != nil {
 		return nil, err
 	}
 	if c.APIKeys, err = ParseAPIKeys(*keys); err != nil {

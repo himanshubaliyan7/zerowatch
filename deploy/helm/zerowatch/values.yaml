@@ -42,6 +42,10 @@ limits:
   rateLimitRPS: 200
   rateLimitBurst: 400
 corsOrigins: []
+# Reverse proxies (IPs or CIDRs) whose X-Forwarded-For is believed for per-IP
+# rate limits, e.g. the ingress controller's pod CIDR. Empty: the header is
+# ignored and every client behind the ingress shares the controller's limit.
+trustedProxies: []
 ports:
   http: 8080         # UI, JSON API, CloudWatch-compatible endpoint (/cloudwatch)
   otlp: 4318         # OTLP/HTTP (/v1/metrics, /v1/logs, /v1/traces)

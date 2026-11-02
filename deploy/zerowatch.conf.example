@@ -8,6 +8,9 @@ server {
         proxy_pass http://127.0.0.1:8080;
         proxy_set_header Host $http_x_original_host;
         proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+        # Read by zerowatch only from --trusted-proxies (127.0.0.1 in zerowatch.service).
+        # To see past an edge proxy in front of nginx, add its addresses there too.
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_http_version 1.1;
         proxy_buffering off;              # SSE live tail
         proxy_set_header Upgrade $http_upgrade;

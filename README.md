@@ -484,6 +484,7 @@ Every flag also has an environment variable (`--flag-name` → `ZW_FLAG_NAME`). 
 | `--metadata-dsn` | SQLite in data dir | `postgres://…` for a shared store |
 | `--cluster-seeds`, `--gossip-port`, `--node-name` | | cluster mode; `ZW_CLUSTER_SECRET` for internal RPC |
 | `--api-keys`, `--aws-credentials`, `--cors-origins` | | auth (prefer env vars) |
+| `--trusted-proxies` | none | IPs or CIDRs of reverse proxies whose `X-Forwarded-For` is believed for per-IP rate limits. Without it the header is ignored, so behind a proxy set this or every client shares the proxy's limit |
 | `--oidc-*`, `ZW_OIDC_CLIENT_SECRET`, `ZW_SESSION_KEY` | | OIDC sign-in |
 | `--tier-*`, `--retention`, `--retention-tenant` | | cold tier and retention |
 | `--supervisor`, `--supervisor-interval`, `--host-metrics`, `--host-root`, `--hostname`, `--log-roots`, `--bpf-object` | `auto`, `10s`, on, …, `/var/log` | node agent |

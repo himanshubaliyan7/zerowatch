@@ -170,6 +170,10 @@ Env shared by every ZeroWatch container. Pass (dict "ctx" $ "nodeNameFrom" "meta
 - name: ZW_CORS_ORIGINS
   value: {{ join "," . | quote }}
 {{- end }}
+{{- with $v.trustedProxies }}
+- name: ZW_TRUSTED_PROXIES
+  value: {{ join "," . | quote }}
+{{- end }}
 - name: ZW_STORAGE
   value: {{ $v.storage.backend | quote }}
 {{- if eq $v.storage.backend "clickhouse" }}

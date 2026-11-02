@@ -8,6 +8,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strconv"
 	"strings"
@@ -194,8 +195,8 @@ func AuthWithSessions(ks *KeyStore, sess Sessions, public func(*http.Request) bo
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if !ks.Enabled() && sess == nil {
+				// No client key: the limiter keys these by IP itself.
 				ctx := WithPrincipal(r.Context(), Principal{Role: RoleAdmin, Tenant: 1, Method: MethodNone})
-				ctx = context.WithValue(ctx, clientKey, "ip:"+clientIP(r))
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
@@ -308,28 +309,86 @@ func sameOrigin(r *http.Request) bool {
 	return false
 }
 
-func clientIP(r *http.Request) string {
-	if xf := r.Header.Get("X-Forwarded-For"); xf != "" {
-		ip, _, _ := strings.Cut(xf, ",")
-		return strings.TrimSpace(ip)
-	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
+// ClientIP is the address a request came from. X-Forwarded-For is believed
+// only when the connection comes from one of the trusted proxies: the header
+// is walked from the right, past every trusted hop, and the first address that
+// isn't trusted is the client. Anything to its left was written by the client
+// and could say anything. With no trusted proxies the header is ignored, so a
+// client can't pick its own rate-limit bucket.
+func ClientIP(r *http.Request, trusted []netip.Prefix) string {
+	peer, ok := remoteAddr(r)
+	if !ok {
 		return r.RemoteAddr
 	}
-	return host
+	if !inPrefixes(peer, trusted) {
+		return peer.String()
+	}
+	var hops []string
+	for _, v := range r.Header.Values("X-Forwarded-For") {
+		hops = append(hops, strings.Split(v, ",")...)
+	}
+	client := peer
+	for i := len(hops) - 1; i >= 0; i-- {
+		a, ok := parseHop(hops[i])
+		if !ok {
+			break // a trusted proxy wouldn't write this; stop at the last hop we can vouch for
+		}
+		client = a
+		if !inPrefixes(a, trusted) {
+			break
+		}
+	}
+	return client.String()
+}
+
+func remoteAddr(r *http.Request) (netip.Addr, bool) {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+	return parseHop(host)
+}
+
+// parseHop parses one X-Forwarded-For entry: an IP, optionally with a port or
+// IPv6 brackets.
+func parseHop(s string) (netip.Addr, bool) {
+	s = strings.TrimSpace(s)
+	if ap, err := netip.ParseAddrPort(s); err == nil {
+		return ap.Addr().Unmap(), true
+	}
+	a, err := netip.ParseAddr(strings.TrimSuffix(strings.TrimPrefix(s, "["), "]"))
+	if err != nil {
+		return netip.Addr{}, false
+	}
+	return a.WithZone("").Unmap(), true
+}
+
+func inPrefixes(a netip.Addr, ps []netip.Prefix) bool {
+	for _, p := range ps {
+		if p.Contains(a) {
+			return true
+		}
+	}
+	return false
 }
 
 // ---- rate limiting
 
 // RateLimiter is a per-client token bucket (keyed by API key digest or IP).
 type RateLimiter struct {
-	rate  float64
-	burst float64
-	mu    sync.Mutex
-	b     map[string]*bucket
-	now   func() time.Time
+	rate    float64
+	burst   float64
+	mu      sync.Mutex
+	b       map[string]*bucket
+	now     func() time.Time
+	trusted []netip.Prefix
 }
+
+// TrustProxies sets the proxies whose X-Forwarded-For is believed when keying
+// clients by IP (see ClientIP). Call it before serving.
+func (rl *RateLimiter) TrustProxies(p []netip.Prefix) { rl.trusted = p }
+
+func (rl *RateLimiter) clientIP(r *http.Request) string { return ClientIP(r, rl.trusted) }
 
 type bucket struct {
 	tokens float64
@@ -396,7 +455,7 @@ func (rl *RateLimiter) Guard(auth func(http.Handler) http.Handler, exempt func(*
 				auth(limited).ServeHTTP(w, r)
 				return
 			}
-			key := "authfail:" + clientIP(r)
+			key := "authfail:" + rl.clientIP(r)
 			if ok, _, retry := rl.Allow(key); !ok {
 				writeRateLimited(w, r, retry)
 				return
@@ -424,7 +483,7 @@ func (rl *RateLimiter) Middleware(exempt func(*http.Request) bool) func(http.Han
 			}
 			key, _ := r.Context().Value(clientKey).(string)
 			if key == "" {
-				key = "ip:" + clientIP(r)
+				key = "ip:" + rl.clientIP(r)
 			}
 			ok, remaining, retry := rl.Allow(key)
 			w.Header().Set("X-RateLimit-Limit", strconv.Itoa(int(rl.burst)))

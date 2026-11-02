@@ -40,6 +40,23 @@ func TestLoadErrors(t *testing.T) {
 	}
 }
 
+func TestTrustedProxies(t *testing.T) {
+	c, err := Load([]string{"--trusted-proxies=10.1.2.3/8, 127.0.0.1, ::1, ::ffff:192.0.2.1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := fmt.Sprint(c.TrustedProxies)
+	if got != "[10.0.0.0/8 127.0.0.1/32 ::1/128 192.0.2.1/32]" {
+		t.Fatal(got)
+	}
+	if c, _ := Load(nil); len(c.TrustedProxies) != 0 {
+		t.Fatal("proxies trusted by default")
+	}
+	if _, err := Load([]string{"--trusted-proxies=10.0.0.0/8,proxy.local"}); err == nil {
+		t.Fatal("hostname accepted")
+	}
+}
+
 func TestAWSCredentials(t *testing.T) {
 	const secret = "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY"
 	c, err := Load([]string{"--aws-credentials=AKIDEXAMPLE:" + secret + ":3, AKID2:0123456789abcdef"})
