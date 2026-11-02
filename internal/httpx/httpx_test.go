@@ -88,6 +88,37 @@ func TestGuardLimitsPerKeyAndThrottlesAuthFailures(t *testing.T) {
 	}
 }
 
+// Bad credentials sent at once must not all slip past the failure budget
+// while auth is still deciding.
+func TestGuardThrottlesConcurrentAuthFailures(t *testing.T) {
+	rl := NewRateLimiter(0.001, 2)
+	slowReject := func(http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(100 * time.Millisecond)
+			WriteError(w, r, Unauthorized("invalid API key"))
+		})
+	}
+	h := rl.Guard(slowReject, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(204) }))
+	const n = 20
+	codes := make(chan int, n)
+	for i := 0; i < n; i++ {
+		go func() {
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, httptest.NewRequest("GET", "/api/x", nil))
+			codes <- rec.Code
+		}()
+	}
+	refused := 0
+	for i := 0; i < n; i++ {
+		if <-codes == 401 {
+			refused++
+		}
+	}
+	if refused != 2 {
+		t.Fatalf("%d of %d concurrent bad credentials reached auth; the burst is 2", refused, n)
+	}
+}
+
 func TestTokenBucketRefill(t *testing.T) {
 	rl := NewRateLimiter(10, 1)
 	now := time.Unix(0, 0)

@@ -372,23 +372,21 @@ func (rl *RateLimiter) sweepLocked(now time.Time) {
 	}
 }
 
-// exhausted reports whether key's bucket is empty, without consuming a token,
-// and the seconds until it has one.
-func (rl *RateLimiter) exhausted(key string) (bool, float64) {
+// refund returns a token taken by Allow, up to the burst.
+func (rl *RateLimiter) refund(key string) {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
-	b := rl.b[key]
-	if b == nil {
-		return false, 0
+	if b := rl.b[key]; b != nil {
+		b.tokens = math.Min(rl.burst, b.tokens+1)
 	}
-	tokens := math.Min(rl.burst, b.tokens+rl.now().Sub(b.last).Seconds()*rl.rate)
-	return tokens < 1, (1 - tokens) / rl.rate
 }
 
 // Guard runs auth and then the limiter, so authenticated clients get their own
 // bucket and don't share one per IP. Requests auth refuses never reach that
-// limiter, so each refusal spends a token from a per-IP budget instead, and an
-// IP that runs out is turned away before its next credential is checked.
+// limiter, so each one is charged to a per-IP failure budget instead. The
+// token is taken before auth runs and given back if auth passes: checking
+// first and charging afterwards would let concurrent bad credentials all pass
+// the check before any of them was charged.
 func (rl *RateLimiter) Guard(auth func(http.Handler) http.Handler, exempt func(*http.Request) bool) func(http.Handler) http.Handler {
 	limit := rl.Middleware(exempt)
 	return func(next http.Handler) http.Handler {
@@ -399,18 +397,14 @@ func (rl *RateLimiter) Guard(auth func(http.Handler) http.Handler, exempt func(*
 				return
 			}
 			key := "authfail:" + clientIP(r)
-			if blocked, retry := rl.exhausted(key); blocked {
+			if ok, _, retry := rl.Allow(key); !ok {
 				writeRateLimited(w, r, retry)
 				return
 			}
-			passed := false
 			auth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				passed = true
+				rl.refund(key)
 				limited.ServeHTTP(w, r)
 			})).ServeHTTP(w, r)
-			if !passed {
-				rl.Allow(key)
-			}
 		})
 	}
 }
