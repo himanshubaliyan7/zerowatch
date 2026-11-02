@@ -265,6 +265,35 @@ func TestEngineTick(t *testing.T) {
 	}
 }
 
+// States is called from API goroutines while Tick steps machines. This only
+// proves anything under `go test -race`.
+func TestStatesDuringTick(t *testing.T) {
+	now := time.UnixMilli(600_000 + 5_000)
+	ff := &fetch{pts: []model.Point{{T: 420_000, V: 95}, {T: 480_000, V: 97}, {T: 540_000, V: 99}}}
+	r := Rule{ID: "r1", Name: "cpu", Enabled: true, PeriodSec: 60, Metric: &query.MetricStat{Namespace: "n", MetricName: "cpu"},
+		Config: cfg(3, 3, MissingMissing), UpdatedAt: time.Unix(1, 0)}
+	if err := r.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	e := &Engine{Rules: rules{r}, Sink: &sink{}, Query: &query.Engine{Fetcher: ff}, Log: slog.New(slog.NewTextHandler(io.Discard, nil)), Now: func() time.Time { return now }}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 200; i++ {
+			_ = e.Tick(context.Background())
+			now = now.Add(time.Minute)
+		}
+	}()
+	for {
+		select {
+		case <-done:
+			return
+		default:
+			_ = e.States()
+		}
+	}
+}
+
 // A new leader (or a restarted replica) resumes from the persisted state:
 // a rule already in ALARM whose data still breaches must not notify again.
 func TestEngineResumesPersistedState(t *testing.T) {

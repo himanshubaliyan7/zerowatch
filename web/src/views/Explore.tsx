@@ -66,6 +66,7 @@ const FUNCTIONS = [
   ["AVG(m) SUM(m) MIN(m) MAX(m)", "one series: reduce over time to a number"],
   ["AVG(m1, m2, …) SUM MIN MAX", "several series: point by point across them"],
   ["RATE(m) DIFF(m)", "change per second / per point"],
+  ["COUNTER_RATE(m)", "per-second rate of a counter, across restarts"],
   ["FILL(m, REPEAT | LINEAR | NONE | 0 | m2)", "fill gaps by a policy, a number or another series"],
   ["PERIOD(m)", "the period in seconds"],
   ["ABS CEIL FLOOR SQRT LOG LOG10", "point-wise maths"],

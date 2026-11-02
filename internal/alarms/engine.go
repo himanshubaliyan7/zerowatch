@@ -233,8 +233,7 @@ func (e *Engine) Tick(ctx context.Context) error {
 		seeded := en.m.State
 		var last *Transition
 		for i, v := range vals {
-			from := en.m.State
-			st, changed, reason := en.m.Step(v)
+			from, st, changed, reason := e.step(en, v)
 			if changed {
 				tr := Transition{RuleID: r.ID, RuleName: r.Name, TenantID: r.TenantID, From: from, To: st, Reason: reason, Value: v,
 					Timestamp: time.UnixMilli(start + int64(i+1)*pMs)}
@@ -301,13 +300,22 @@ func (e *Engine) stepPredictive(ctx context.Context, r Rule, en *entry, end int6
 			v, method = &worst, m
 		}
 	}
-	from := en.m.State
-	st, changed, reason := en.m.Step(v)
+	from, st, changed, reason := e.step(en, v)
 	if changed {
 		reason = fmt.Sprintf("forecast (%s, next %s): %s", method, time.Duration(r.ForecastHorizonSec)*time.Second, reason)
 		e.emit(ctx, r, Transition{RuleID: r.ID, RuleName: r.Name, TenantID: r.TenantID, From: from, To: st, Reason: reason, Value: v,
 			Timestamp: time.UnixMilli(end)})
 	}
+}
+
+// step advances en's machine under e.mu, because States reads machine state
+// from API goroutines while Tick runs. It returns the state before the step.
+func (e *Engine) step(en *entry, v *float64) (from, to State, changed bool, reason string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	from = en.m.State
+	to, changed, reason = en.m.Step(v)
+	return from, to, changed, reason
 }
 
 func (e *Engine) emit(ctx context.Context, r Rule, tr Transition) {

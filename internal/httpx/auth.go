@@ -372,6 +372,54 @@ func (rl *RateLimiter) sweepLocked(now time.Time) {
 	}
 }
 
+// exhausted reports whether key's bucket is empty, without consuming a token,
+// and the seconds until it has one.
+func (rl *RateLimiter) exhausted(key string) (bool, float64) {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	b := rl.b[key]
+	if b == nil {
+		return false, 0
+	}
+	tokens := math.Min(rl.burst, b.tokens+rl.now().Sub(b.last).Seconds()*rl.rate)
+	return tokens < 1, (1 - tokens) / rl.rate
+}
+
+// Guard runs auth and then the limiter, so authenticated clients get their own
+// bucket and don't share one per IP. Requests auth refuses never reach that
+// limiter, so each refusal spends a token from a per-IP budget instead, and an
+// IP that runs out is turned away before its next credential is checked.
+func (rl *RateLimiter) Guard(auth func(http.Handler) http.Handler, exempt func(*http.Request) bool) func(http.Handler) http.Handler {
+	limit := rl.Middleware(exempt)
+	return func(next http.Handler) http.Handler {
+		limited := limit(next)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if exempt != nil && exempt(r) {
+				auth(limited).ServeHTTP(w, r)
+				return
+			}
+			key := "authfail:" + clientIP(r)
+			if blocked, retry := rl.exhausted(key); blocked {
+				writeRateLimited(w, r, retry)
+				return
+			}
+			passed := false
+			auth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				passed = true
+				limited.ServeHTTP(w, r)
+			})).ServeHTTP(w, r)
+			if !passed {
+				rl.Allow(key)
+			}
+		})
+	}
+}
+
+func writeRateLimited(w http.ResponseWriter, r *http.Request, retry float64) {
+	w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(retry))))
+	WriteError(w, r, &APIError{Status: http.StatusTooManyRequests, Code: "RATE_LIMITED", Message: "too many requests"})
+}
+
 // Middleware applies the limiter after Auth (so clients are keyed by key).
 func (rl *RateLimiter) Middleware(exempt func(*http.Request) bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -388,8 +436,7 @@ func (rl *RateLimiter) Middleware(exempt func(*http.Request) bool) func(http.Han
 			w.Header().Set("X-RateLimit-Limit", strconv.Itoa(int(rl.burst)))
 			w.Header().Set("X-RateLimit-Remaining", strconv.Itoa(int(remaining)))
 			if !ok {
-				w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(retry))))
-				WriteError(w, r, &APIError{Status: http.StatusTooManyRequests, Code: "RATE_LIMITED", Message: "too many requests"})
+				writeRateLimited(w, r, retry)
 				return
 			}
 			next.ServeHTTP(w, r)

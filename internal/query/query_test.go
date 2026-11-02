@@ -171,6 +171,39 @@ func TestPartialData(t *testing.T) {
 	}
 }
 
+// A counter restart must read as an increase. RATE keeps GetMetricData
+// semantics, where the same drop is a negative rate.
+func TestCounterRateHandlesResets(t *testing.T) {
+	f := fakeFetcher{"c": {{T: 0, V: 100}, {T: 60_000, V: 160}, {T: 120_000, V: 6}, {T: 180_000, V: 66}}}
+	no := false
+	res, err := (&Engine{Fetcher: f}).Execute(context.Background(), Request{
+		StartMs: 0, EndMs: 240_000, Period: 60,
+		Queries: []MetricDataQuery{
+			{ID: "m1", MetricStat: &MetricStat{MetricName: "c", Stat: "Average"}, ReturnData: &no},
+			{ID: "counter", Expression: "COUNTER_RATE(m1)"},
+			{ID: "plain", Expression: "RATE(m1)"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res) != 2 {
+		t.Fatalf("results %+v", res)
+	}
+	want := map[string][]float64{"counter": {1, 0.1, 1}, "plain": {1, -154.0 / 60, 1}}
+	for _, r := range res {
+		w := want[r.ID]
+		if len(r.Values) != len(w) {
+			t.Fatalf("%s values %v", r.ID, r.Values)
+		}
+		for i := range w {
+			if math.Abs(r.Values[i]-w[i]) > 1e-9 {
+				t.Errorf("%s[%d] = %v, want %v", r.ID, i, r.Values[i], w[i])
+			}
+		}
+	}
+}
+
 func TestEngineEndToEnd(t *testing.T) {
 	f := fakeFetcher{
 		"a":   {{T: 0, V: 10}, {T: 60_000, V: 20}, {T: 120_000, V: 30}, {T: 180_000, V: 40}},

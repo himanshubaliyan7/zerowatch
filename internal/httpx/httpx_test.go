@@ -57,6 +57,37 @@ func TestAuthAndRateLimit(t *testing.T) {
 	}
 }
 
+// Two keys behind one IP (a proxy, a NAT) must not share a bucket, and a bad
+// credential must still be throttled even though it never passes auth.
+func TestGuardLimitsPerKeyAndThrottlesAuthFailures(t *testing.T) {
+	const a, b = "secret-key-aaaaaaaaaaaa", "secret-key-bbbbbbbbbbbb"
+	ks := NewKeyStore(map[string]uint32{a: 1, b: 2})
+	rl := NewRateLimiter(1, 2)
+	now := time.Unix(0, 0)
+	rl.now = func() time.Time { return now }
+	h := rl.Guard(Auth(ks, nil), nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(204) }))
+	do := func(key string) int {
+		req := httptest.NewRequest("GET", "/api/x", nil)
+		req.Header.Set("Authorization", "Bearer "+key)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec.Code
+	}
+	if c1, c2, c3 := do(a), do(a), do(a); c1 != 204 || c2 != 204 || c3 != 429 {
+		t.Fatalf("key a: %d %d %d, want 204 204 429", c1, c2, c3)
+	}
+	if c := do(b); c != 204 {
+		t.Fatalf("key b shares key a's bucket: %d", c)
+	}
+	if c1, c2, c3 := do("bad-1"), do("bad-2"), do("bad-3"); c1 != 401 || c2 != 401 || c3 != 429 {
+		t.Fatalf("bad keys: %d %d %d, want 401 401 429", c1, c2, c3)
+	}
+	now = now.Add(2 * time.Second)
+	if c := do("bad-4"); c != 401 {
+		t.Fatalf("failure budget should refill: %d", c)
+	}
+}
+
 func TestTokenBucketRefill(t *testing.T) {
 	rl := NewRateLimiter(10, 1)
 	now := time.Unix(0, 0)
