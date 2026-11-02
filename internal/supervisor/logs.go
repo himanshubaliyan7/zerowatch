@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"io/fs"
 	"os"
@@ -464,50 +465,78 @@ func (t *Tailer) Poll(ctx context.Context, now time.Time) int {
 		if ctx.Err() != nil {
 			break
 		}
-		evs, newOff, size, err := t.read(s, now)
+		evs, ends, consumed, size, err := t.read(s, now)
 		t.mu.Lock()
 		s.Size = size
 		if err != nil {
 			s.Error = err.Error()
 		} else {
 			s.Error = ""
-			s.Offset = newOff
 		}
 		t.mu.Unlock()
+		if err != nil {
+			continue
+		}
+		// The offset moves only past lines the writer took, so a failed write
+		// (backpressure, shutdown) is re-read on the next poll, not lost.
+		offset := consumed
 		for i := 0; i < len(evs); i += 1000 {
 			batch := evs[i:min(i+1000, len(evs))]
-			res, _ := t.Writer.WriteLogs(ctx, t.Tenant, batch)
+			res, werr := t.Writer.WriteLogs(ctx, t.Tenant, batch)
 			t.mu.Lock()
 			s.Shipped += uint64(res.Accepted)
+			if werr != nil {
+				s.Error = "ship: " + werr.Error()
+			}
 			t.mu.Unlock()
 			total += res.Accepted
+			if werr != nil && !permanentWriteError(werr) {
+				if i == 0 {
+					offset = s.Offset
+				} else {
+					offset = ends[i-1]
+				}
+				break
+			}
 		}
+		t.mu.Lock()
+		s.Offset = offset
+		t.mu.Unlock()
 	}
 	return total
 }
 
-func (t *Tailer) read(s *LogSource, now time.Time) ([]model.LogEvent, int64, int64, error) {
+// permanentWriteError reports a batch that would fail the same way on retry.
+// Such lines are skipped, or one bad batch would stall the file forever.
+func permanentWriteError(err error) bool {
+	return errors.Is(err, model.ErrValidation) || errors.Is(err, ingest.ErrAllRejected)
+}
+
+// read returns the parsed events, the file offset just past each event's line,
+// the offset after everything consumed, and the file size.
+func (t *Tailer) read(s *LogSource, now time.Time) ([]model.LogEvent, []int64, int64, int64, error) {
 	f, err := os.Open(s.Path)
 	if err != nil {
-		return nil, s.Offset, s.Size, err
+		return nil, nil, s.Offset, s.Size, err
 	}
 	defer f.Close()
 	st, err := f.Stat()
 	if err != nil {
-		return nil, s.Offset, s.Size, err
+		return nil, nil, s.Offset, s.Size, err
 	}
 	off := s.Offset
 	if st.Size() < off { // truncated or replaced
 		off = 0
 	}
 	if st.Size() == off {
-		return nil, off, st.Size(), nil
+		return nil, nil, off, st.Size(), nil
 	}
 	if _, err := f.Seek(off, io.SeekStart); err != nil {
-		return nil, off, st.Size(), err
+		return nil, nil, off, st.Size(), err
 	}
 	r := bufio.NewReaderSize(io.LimitReader(f, t.MaxPerCycle), 64<<10)
 	var evs []model.LogEvent
+	var ends []int64
 	consumed := off
 	skipFirst := s.Offset > 0 && off == s.Offset && off == max(0, s.Size-t.InitialBytes) && s.Shipped == 0 && off > 0
 	for {
@@ -535,6 +564,7 @@ func (t *Tailer) read(s *LogSource, now time.Time) ([]model.LogEvent, int64, int
 		ev.Attributes["source"] = "file"
 		ev.Attributes["format"] = s.Guess.Format
 		evs = append(evs, ev)
+		ends = append(ends, consumed)
 	}
-	return evs, consumed, st.Size(), nil
+	return evs, ends, consumed, st.Size(), nil
 }

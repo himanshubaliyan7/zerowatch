@@ -418,12 +418,21 @@ func (s *SQLStore) SaveAlarmRule(ctx context.Context, r *alarms.Rule) error {
 	if err != nil {
 		return err
 	}
-	_, err = s.exec(ctx, nil, `INSERT INTO alert_rules (id, tenant_id, name, expression, evaluation_period, datapoints_to_alarm, state, definition, updated_at)
+	// The WHERE keeps an id owned by another tenant from being overwritten: the
+	// row is left alone and zero rows are affected.
+	res, err := s.exec(ctx, nil, `INSERT INTO alert_rules (id, tenant_id, name, expression, evaluation_period, datapoints_to_alarm, state, definition, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (id) DO UPDATE SET name = excluded.name, expression = excluded.expression, evaluation_period = excluded.evaluation_period,
- datapoints_to_alarm = excluded.datapoints_to_alarm, definition = excluded.definition, updated_at = excluded.updated_at`,
+ datapoints_to_alarm = excluded.datapoints_to_alarm, definition = excluded.definition, updated_at = excluded.updated_at
+WHERE alert_rules.tenant_id = excluded.tenant_id`,
 		r.ID, r.TenantID, r.Name, r.Expression, r.Config.EvaluationPeriods, r.Config.DatapointsToAlarm, string(r.State), string(def), ms(r.UpdatedAt))
-	return err
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // DeleteAlarmRule removes a rule (history is retained).

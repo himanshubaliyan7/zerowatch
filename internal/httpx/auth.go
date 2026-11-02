@@ -372,6 +372,48 @@ func (rl *RateLimiter) sweepLocked(now time.Time) {
 	}
 }
 
+// refund returns a token taken by Allow, up to the burst.
+func (rl *RateLimiter) refund(key string) {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	if b := rl.b[key]; b != nil {
+		b.tokens = math.Min(rl.burst, b.tokens+1)
+	}
+}
+
+// Guard runs auth and then the limiter, so authenticated clients get their own
+// bucket and don't share one per IP. Requests auth refuses never reach that
+// limiter, so each one is charged to a per-IP failure budget instead. The
+// token is taken before auth runs and given back if auth passes: checking
+// first and charging afterwards would let concurrent bad credentials all pass
+// the check before any of them was charged.
+func (rl *RateLimiter) Guard(auth func(http.Handler) http.Handler, exempt func(*http.Request) bool) func(http.Handler) http.Handler {
+	limit := rl.Middleware(exempt)
+	return func(next http.Handler) http.Handler {
+		limited := limit(next)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if exempt != nil && exempt(r) {
+				auth(limited).ServeHTTP(w, r)
+				return
+			}
+			key := "authfail:" + clientIP(r)
+			if ok, _, retry := rl.Allow(key); !ok {
+				writeRateLimited(w, r, retry)
+				return
+			}
+			auth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				rl.refund(key)
+				limited.ServeHTTP(w, r)
+			})).ServeHTTP(w, r)
+		})
+	}
+}
+
+func writeRateLimited(w http.ResponseWriter, r *http.Request, retry float64) {
+	w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(retry))))
+	WriteError(w, r, &APIError{Status: http.StatusTooManyRequests, Code: "RATE_LIMITED", Message: "too many requests"})
+}
+
 // Middleware applies the limiter after Auth (so clients are keyed by key).
 func (rl *RateLimiter) Middleware(exempt func(*http.Request) bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -388,8 +430,7 @@ func (rl *RateLimiter) Middleware(exempt func(*http.Request) bool) func(http.Han
 			w.Header().Set("X-RateLimit-Limit", strconv.Itoa(int(rl.burst)))
 			w.Header().Set("X-RateLimit-Remaining", strconv.Itoa(int(remaining)))
 			if !ok {
-				w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(retry))))
-				WriteError(w, r, &APIError{Status: http.StatusTooManyRequests, Code: "RATE_LIMITED", Message: "too many requests"})
+				writeRateLimited(w, r, retry)
 				return
 			}
 			next.ServeHTTP(w, r)

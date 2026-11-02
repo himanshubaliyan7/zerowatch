@@ -68,7 +68,7 @@ ZeroWatch keeps the CloudWatch data model and APIs, so existing `PutMetricData` 
 - **Zero-touch supervisor.** It finds processes, listening ports and containers. It attaches an eBPF probe (or a `/proc` fallback) for RED metrics, tails and parses logs, and synthesizes dashboards and alarms. It stays under a 1 % CPU budget.
 - **eBPF RED metrics.** It parses HTTP/1.x in the kernel: plaintext through syscalls, and HTTPS through OpenSSL `SSL_read`/`SSL_write` uprobes. It handles containers in their own PID namespaces.
 - **CloudWatch-compatible ingest.** Query and JSON protocols with SigV4 verification, plus OTLP (JSON and protobuf, metrics, logs and traces), Prometheus remote write, StatsD, EMF (metrics embedded in log lines) and a native JSON API.
-- **Time-series engine.** Gorilla-compressed chunks with 1-minute rollups. Exact percentiles. Metric math (`+ − × ÷ ^`, `AVG/SUM/MIN/MAX`, `RATE`, `DIFF`, `FILL`, …).
+- **Time-series engine.** Gorilla-compressed chunks with 1-minute rollups. Exact percentiles. Metric math (`+ − × ÷ ^`, `AVG/SUM/MIN/MAX`, `RATE`, `COUNTER_RATE`, `DIFF`, `FILL`, …).
 - **Logs.** Search with facets, live tail over SSE, and one click from a chart spike to that moment's logs.
 - **Traces.** OTLP traces, a span waterfall, and a duration scatter. Logs link to traces through `trace_id`.
 - **Alarms.**

@@ -200,7 +200,10 @@ func call(c *Call, env *Env) (Value, error) {
 			out[t] = reduce(col, c.Name)
 		}
 		return VecV(out), nil
-	case "RATE", "DIFF":
+	case "RATE", "DIFF", "COUNTER_RATE":
+		// RATE and DIFF keep GetMetricData semantics, so a falling gauge stays
+		// negative. COUNTER_RATE is for monotonic counters: a drop means the
+		// counter restarted, so the new value is the increase since the reset.
 		if err := argc(1, 1); err != nil {
 			return Value{}, err
 		}
@@ -220,7 +223,10 @@ func call(c *Call, env *Env) (Value, error) {
 			}
 			if prevI >= 0 {
 				d := x - v.Vec[prevI]
-				if c.Name == "RATE" {
+				if c.Name == "COUNTER_RATE" && d < 0 {
+					d = x
+				}
+				if c.Name != "DIFF" {
 					secs := float64(int64(i-prevI)*env.Grid.PeriodMs) / 1000
 					d /= secs
 				}

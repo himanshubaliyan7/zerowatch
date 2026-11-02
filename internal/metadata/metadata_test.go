@@ -62,6 +62,36 @@ func TestDashboardsCRUDAndCAS(t *testing.T) {
 	}
 }
 
+// A tenant that learns another tenant's rule id must not be able to overwrite
+// the rule through PUT /api/v1/alarms/{id}, which takes the id from the URL.
+func TestSaveAlarmRuleRefusesAnotherTenantsID(t *testing.T) {
+	s := open(t)
+	ctx := context.Background()
+	rule := func(tenant uint32, id, name string) *alarms.Rule {
+		return &alarms.Rule{ID: id, TenantID: tenant, Name: name, Enabled: true, Metric: &query.MetricStat{Namespace: "n", MetricName: "cpu"},
+			Config: alarms.Config{Threshold: 80, Comparison: alarms.GreaterThanThreshold, EvaluationPeriods: 3}}
+	}
+	if err := s.SaveAlarmRule(ctx, rule(1, "shared-id", "owner's rule")); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SaveAlarmRule(ctx, rule(2, "shared-id", "attacker's rule")); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("want ErrNotFound, got %v", err)
+	}
+	got, err := s.GetAlarmRule(ctx, 1, "shared-id")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Name != "owner's rule" || got.TenantID != 1 {
+		t.Fatalf("rule overwritten: %+v", got)
+	}
+	if err := s.SaveAlarmRule(ctx, rule(1, "shared-id", "owner's edit")); err != nil {
+		t.Fatalf("the owner must still be able to update: %v", err)
+	}
+	if got, _ = s.GetAlarmRule(ctx, 1, "shared-id"); got.Name != "owner's edit" {
+		t.Fatalf("update lost: %+v", got)
+	}
+}
+
 func TestAlarmRulesAndHistory(t *testing.T) {
 	s := open(t)
 	ctx := context.Background()

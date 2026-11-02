@@ -2,8 +2,11 @@ package supervisor
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -43,6 +46,93 @@ type memWriter struct{ evs []model.LogEvent }
 func (m *memWriter) WriteLogs(_ context.Context, _ uint32, ls []model.LogEvent) (ingest.Result, error) {
 	m.evs = append(m.evs, ls...)
 	return ingest.Result{Accepted: len(ls)}, nil
+}
+
+// scriptedWriter returns errs[n] for the nth call, keeping the batch on success.
+type scriptedWriter struct {
+	errs  []error
+	calls int
+	evs   []model.LogEvent
+}
+
+func (s *scriptedWriter) WriteLogs(_ context.Context, _ uint32, ls []model.LogEvent) (ingest.Result, error) {
+	n := s.calls
+	s.calls++
+	if n < len(s.errs) && s.errs[n] != nil {
+		return ingest.Result{}, s.errs[n]
+	}
+	s.evs = append(s.evs, ls...)
+	return ingest.Result{Accepted: len(ls)}, nil
+}
+
+func tailFile(t *testing.T, content string, w LogWriter) (*Tailer, string) {
+	t.Helper()
+	dir := t.TempDir()
+	p := filepath.Join(dir, "app.log")
+	if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tl := NewTailer(w, 1, "test")
+	tl.InitialBytes = 1 << 20
+	tl.Track([]string{p}, time.Now())
+	return tl, p
+}
+
+// A transient write failure must not lose lines: they are re-read next poll.
+func TestTailerRetriesFailedWrite(t *testing.T) {
+	w := &scriptedWriter{errs: []error{errors.New("backpressure")}}
+	tl, _ := tailFile(t, "one\ntwo\n", w)
+	now := time.Now()
+	if n := tl.Poll(context.Background(), now); n != 0 {
+		t.Fatalf("failed poll shipped %d", n)
+	}
+	if src := tl.Sources()[0]; src.Offset != 0 || !strings.Contains(src.Error, "backpressure") {
+		t.Fatalf("offset %d error %q", src.Offset, src.Error)
+	}
+	if n := tl.Poll(context.Background(), now); n != 2 || len(w.evs) != 2 {
+		t.Fatalf("retry shipped %d, have %d", n, len(w.evs))
+	}
+	if n := tl.Poll(context.Background(), now); n != 0 || len(w.evs) != 2 {
+		t.Fatalf("lines shipped twice: %d, have %d", n, len(w.evs))
+	}
+}
+
+// When a later batch fails, only that batch is retried: the earlier one was
+// accepted and must not be shipped again.
+func TestTailerKeepsProgressAcrossBatches(t *testing.T) {
+	var b strings.Builder
+	for i := 0; i < 1500; i++ {
+		fmt.Fprintf(&b, "line %d\n", i)
+	}
+	w := &scriptedWriter{errs: []error{nil, errors.New("backpressure")}}
+	tl, _ := tailFile(t, b.String(), w)
+	now := time.Now()
+	if n := tl.Poll(context.Background(), now); n != 1000 {
+		t.Fatalf("first poll shipped %d, want 1000", n)
+	}
+	if n := tl.Poll(context.Background(), now); n != 500 || len(w.evs) != 1500 {
+		t.Fatalf("second poll shipped %d, have %d", n, len(w.evs))
+	}
+	if !strings.Contains(w.evs[1000].Message, "line 1000") {
+		t.Fatalf("resumed at %q", w.evs[1000].Message)
+	}
+}
+
+// A batch that can never succeed is skipped, or the file would stall forever.
+func TestTailerSkipsPermanentlyRejectedBatch(t *testing.T) {
+	w := &scriptedWriter{errs: []error{ingest.ErrAllRejected}}
+	tl, p := tailFile(t, "bad\n", w)
+	now := time.Now()
+	tl.Poll(context.Background(), now)
+	f, err := os.OpenFile(p, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = f.WriteString("good\n")
+	f.Close()
+	if n := tl.Poll(context.Background(), now); n != 1 || w.evs[0].Message != "good" {
+		t.Fatalf("shipped %d: %+v", n, w.evs)
+	}
 }
 
 func TestTailerFollowsAppends(t *testing.T) {

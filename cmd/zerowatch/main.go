@@ -44,6 +44,11 @@ import (
 	"github.com/himanshubaliyan7/zerowatch/web"
 )
 
+// alarmEvent is the live event for a transition, routed to the rule's tenant.
+func alarmEvent(tr alarms.Transition, now time.Time) live.Event {
+	return live.Event{Kind: live.KindAlarm, TenantID: tr.TenantID, Time: now.UnixMilli(), Data: tr}
+}
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, "zerowatch:", err)
@@ -222,7 +227,7 @@ func run() error {
 	}
 	alarmEngine := &alarms.Engine{Rules: meta, Sink: meta, Query: qe, Dispatcher: alarms.NewDispatcher(log), Log: log, Forecaster: fc,
 		IngestLag: 30 * time.Second, OnTransition: func(tr alarms.Transition) {
-			hub.Publish(live.Event{Kind: live.KindAlarm, TenantID: 1, Time: time.Now().UnixMilli(), Data: tr})
+			hub.Publish(alarmEvent(tr, time.Now()))
 		}}
 
 	if cfg.Generate {
@@ -343,10 +348,10 @@ func run() error {
 	}
 	rl := httpx.NewRateLimiter(cfg.RateLimitRPS, cfg.RateLimitBurst)
 	handler := httpx.Chain(mux, httpx.Observe(log), httpx.SecurityHeaders, httpx.CORS(cfg.CORSOrigins),
-		rl.Middleware(func(r *http.Request) bool {
-			return r.URL.Path == "/healthz" || strings.HasPrefix(r.URL.Path, "/assets/")
-		}),
-		httpx.AuthWithSessions(ks, sess, func(r *http.Request) bool { return api.IsPublic(r) || authn.IsPublic(r) }),
+		rl.Guard(httpx.AuthWithSessions(ks, sess, func(r *http.Request) bool { return api.IsPublic(r) || authn.IsPublic(r) }),
+			func(r *http.Request) bool {
+				return r.URL.Path == "/healthz" || strings.HasPrefix(r.URL.Path, "/assets/")
+			}),
 		authn.RBAC)
 	if node.Internal != nil {
 		// Peer RPC bypasses API keys and per-client rate limits; it has its
